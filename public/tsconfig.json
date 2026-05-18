@@ -1,27 +1,14 @@
 {
-  "extends": "../tsconfig.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": ".",
-    "module": "ES2022",
-    "moduleResolution": "bundler",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "composite": true
-  },
-  "references": [
-    {
-      "path": "../shared"
-    }
-  ],
-  "include": [
-    "./**/*.ts"
-  ],
-  "exclude": [
-    "dist",
-    "node_modules"
-  ]
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"outDir": "../dist/public",
+		"rootDir": ".",
+		"module": "ES2022",
+		"moduleResolution": "bundler",
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"composite": true,
+		"noEmit": true
+	},
+	"references": [{ "path": "../shared" }],
+	"include": ["./**/*.ts"]
 }

@@ -6,12 +6,12 @@ import { initSession } from "./session";
 import { checkURLForRoom } from "./url";
 
 document.addEventListener("DOMContentLoaded", () => {
-   (function () {
-      initSession();
-      initMenuSocket();
-      initMenuControls();
-      initGameSocket();
-      initGameControls();
-      checkURLForRoom();
-   })();
+    (function () {
+        initSession();
+        initMenuSocket();
+        initMenuControls();
+        initGameSocket();
+        initGameControls();
+        checkURLForRoom();
+    })();
 });

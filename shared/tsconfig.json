@@ -1,20 +1,13 @@
 {
-   "extends": "../tsconfig.json",
-   "compilerOptions": {
-      "outDir": "./dist",
-      "rootDir": ".",
-      "module": "ES2022",
-      "moduleResolution": "bundler",
-      "lib": [
-         "ES2022"
-      ],
-      "composite": true
-   },
-   "include": [
-      "./**/*.ts"
-   ],
-   "exclude": [
-      "dist",
-      "node_modules"
-   ]
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"outDir": "../dist/shared",
+		"rootDir": ".",
+		"module": "ES2022",
+		"moduleResolution": "node",
+		"ignoreDeprecations": "6.0",
+		"lib": ["ES2022"],
+		"composite": true
+	},
+	"include": ["./**/*.ts"]
 }
