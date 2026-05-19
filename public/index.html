@@ -2,125 +2,125 @@
 <html lang="en">
 
 <head>
-   <meta charset="UTF-8" />
-   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-   <title>Bughouse</title>
-   <link rel="stylesheet" href="/styles/base.css" />
-   <link rel="stylesheet" href="/styles/menu.css" />
-   <link rel="stylesheet" href="/styles/chess.css" />
-   <link rel="stylesheet" href="/styles/sidebar.css" />
-   <link rel="stylesheet" href="/styles/controls.css" />
-   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Bughouse</title>
+	<link rel="stylesheet" href="/styles/base.css" />
+	<link rel="stylesheet" href="/styles/menu.css" />
+	<link rel="stylesheet" href="/styles/chess.css" />
+	<link rel="stylesheet" href="/styles/sidebar.css" />
+	<link rel="stylesheet" href="/styles/controls.css" />
+	<link rel="icon" type="image/x-icon" href="/favicon.ico" />
 </head>
 
 <body>
-   <!-- MENU SCREEN -->
-   <div id="menu" class="screen">
-      <h1 id="menu-header">
-         <img src="/favicon.ico" alt="Bughouse" id="logo" />
-      </h1>
-      <div id="menu-container">
-         <!-- LEFT SIDE: CONTROLS -->
-         <div id="section">
-            <input type="text" id="player-name-input" placeholder="Enter your name" maxlength="20" autocomplete="off"
-               required />
-            <button id="create-game-btn" class="game-action-btn">
-               Create Game
-            </button>
-            <button id="join-game-btn" class="game-action-btn">
-               Join from ID
-            </button>
-            <div class="form-group">
-               <button id="setting-btn" class="util-btns">
-                  <p>⚙</p>
-               </button>
-               <button id="info-btn" class="util-btns">
-                  <p>?</p>
-               </button>
-            </div>
-         </div>
-         <!-- RIGHT SIDE: ROOM LISTING -->
-         <div id="lobbies-list"></div>
-      </div>
-      <div id="menu-error"></div>
-   </div>
+	<!-- MENU SCREEN -->
+	<div id="menu" class="screen">
+		<h1 id="menu-header">
+			<img src="/favicon.ico" alt="Bughouse" id="logo" />
+		</h1>
+		<div id="menu-container">
+			<!-- LEFT SIDE: CONTROLS -->
+			<div id="section">
+				<input type="text" id="player-name-input" placeholder="Enter your name" maxlength="20"
+					autocomplete="off" required />
+				<button id="create-game-btn" class="game-action-btn">
+					Create Game
+				</button>
+				<button id="join-game-btn" class="game-action-btn">
+					Join from ID
+				</button>
+				<div class="form-group">
+					<button id="setting-btn" class="util-btns">
+						<p>⚙</p>
+					</button>
+					<button id="info-btn" class="util-btns">
+						<p>?</p>
+					</button>
+				</div>
+			</div>
+			<!-- RIGHT SIDE: ROOM LISTING -->
+			<div id="lobbies-list"></div>
+		</div>
+		<div id="menu-error"></div>
+	</div>
 
-   <!-- JOIN MODAL -->
-   <div id="join-modal" class="modal hidden">
-      <div class="modal-content">
-         <h2>Join Game</h2>
-         <p>Enter the 4-character room code</p>
-         <div class="form-group">
-            <input type="text" id="join-room-code-input" placeholder="Room code" maxlength="4" autocomplete="off"
-               required />
-         </div>
-         <div class="modal-buttons">
-            <button id="submit-join-btn" class="primary-btn">Join</button>
-            <button id="close-join-modal" class="secondary-btn">
-               Cancel
-            </button>
-         </div>
-      </div>
-   </div>
+	<!-- JOIN MODAL -->
+	<div id="join-modal" class="modal hidden">
+		<div class="modal-content">
+			<h2>Join Game</h2>
+			<p>Enter the 4-character room code</p>
+			<div class="form-group">
+				<input type="text" id="join-room-code-input" placeholder="Room code" maxlength="4" autocomplete="off"
+					required />
+			</div>
+			<div class="modal-buttons">
+				<button id="submit-join-btn" class="primary-btn">Join</button>
+				<button id="close-join-modal" class="secondary-btn">
+					Cancel
+				</button>
+			</div>
+		</div>
+	</div>
 
-   <!-- LOBBY + GAME SCREEN -->
-   <div id="game" class="screen hidden">
-      <div id="game-sidebar">
-         <div id="sidebar-header">
-            <button id="leave-game-btn">⎋</button>
-            <div id="game-title">
-               Room: <span id="game-room-code"></span>
-            </div>
-            <div class="ping-indicator" id="ping-indicator">
-               <div class="ping-bars">
-                  <div class="ping-bar" data-bar-index="0"></div>
-                  <div class="ping-bar" data-bar-index="1"></div>
-                  <div class="ping-bar" data-bar-index="2"></div>
-                  <div class="ping-bar" data-bar-index="3"></div>
-                  <div class="ping-bar" data-bar-index="4"></div>
-               </div>
-            </div>
-         </div>
-         <button id="ready-btn">Ready</button>
-         <button id="resign-btn">Resign</button>
-         <div id="player-list"></div>
-         <div id="chat-section">
-            <div id="chat-messages"></div>
-            <div id="chat-input-container">
-               <input type="text" id="chat-input" placeholder="Type message..." maxlength="200" />
-            </div>
-         </div>
-      </div>
-      <div id="game-area-wrapper">
-         <div class="scroll-controls">
-            <button class="scroll-btn" id="scrollLeft">←</button>
-            <span class="scroll-indicator">Board <span id="boardRange">1</span> of
-               <span id="totalBoards">1</span></span>
-            <button id="grid-toggle-btn" class="control-btn">
-               Grid View
-            </button>
-            <button class="scroll-btn" id="scrollRight">→</button>
-         </div>
-         <div id="game-area" class="hide-scrollbar"></div>
-      </div>
-   </div>
-   <!-- NAME MODAL -->
-   <div id="name-modal" class="modal hidden">
-      <div class="modal-content">
-         <h2>Please Enter Your Name</h2>
-         <p>You need to set a name before joining a room</p>
-         <div class="form-group">
-            <input type="text" id="modal-name-input" placeholder="Enter your name" maxlength="20" required />
-         </div>
-         <div id="modal-error" class="error"></div>
-         <div class="modal-buttons">
-            <button id="submit-name-btn" class="primary-btn">Confirm</button>
-            <button id="close-modal" class="secondary-btn">Cancel</button>
-         </div>
-      </div>
-   </div>
-   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-   <script type="module" src="/dist/client.js"></script>
+	<!-- LOBBY + GAME SCREEN -->
+	<div id="game" class="screen hidden">
+		<div id="game-sidebar">
+			<div id="sidebar-header">
+				<button id="leave-game-btn">⎋</button>
+				<div id="game-title">
+					Room: <span id="game-room-code"></span>
+				</div>
+				<div class="ping-indicator" id="ping-indicator">
+					<div class="ping-bars">
+						<div class="ping-bar" data-bar-index="0"></div>
+						<div class="ping-bar" data-bar-index="1"></div>
+						<div class="ping-bar" data-bar-index="2"></div>
+						<div class="ping-bar" data-bar-index="3"></div>
+						<div class="ping-bar" data-bar-index="4"></div>
+					</div>
+				</div>
+			</div>
+			<button id="ready-btn">Ready</button>
+			<button id="resign-btn">Resign</button>
+			<div id="player-list"></div>
+			<div id="chat-section">
+				<div id="chat-messages"></div>
+				<div id="chat-input-container">
+					<input type="text" id="chat-input" placeholder="Type message..." maxlength="200" />
+				</div>
+			</div>
+		</div>
+		<div id="game-area-wrapper">
+			<div class="scroll-controls">
+				<button class="scroll-btn" id="scrollLeft">←</button>
+				<span class="scroll-indicator">Board <span id="boardRange">1</span> of
+					<span id="totalBoards">1</span></span>
+				<button id="grid-toggle-btn" class="control-btn">
+					Grid View
+				</button>
+				<button class="scroll-btn" id="scrollRight">→</button>
+			</div>
+			<div id="game-area" class="hide-scrollbar"></div>
+		</div>
+	</div>
+	<!-- NAME MODAL -->
+	<div id="name-modal" class="modal hidden">
+		<div class="modal-content">
+			<h2>Please Enter Your Name</h2>
+			<p>You need to set a name before joining a room</p>
+			<div class="form-group">
+				<input type="text" id="modal-name-input" placeholder="Enter your name" maxlength="20" required />
+			</div>
+			<div id="modal-error" class="error"></div>
+			<div class="modal-buttons">
+				<button id="submit-name-btn" class="primary-btn">Confirm</button>
+				<button id="close-modal" class="secondary-btn">Cancel</button>
+			</div>
+		</div>
+	</div>
+	<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+	<script type="module" src="/client.js"></script>
 </body>
 
 </html>

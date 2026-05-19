@@ -6,14 +6,14 @@ import { Server, Socket } from "socket.io";
 import { Player } from "../shared/player";
 import type { Room } from "../shared/room";
 import { RoomStatus, Team } from "../shared/room";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const app = express();
 const server = http.createServer(app);
 export const io = new Server(server);
-
 export const rooms = new Map<string, Room>();
 export const profiles = new Map<string, Profile>();
-
 export const MENU_ROOM = "*";
 
 export class GameSocket extends Socket {
@@ -27,20 +27,20 @@ export interface Profile {
 	auth: string;
 }
 
-const publicPath = new URL("../../public", import.meta.url).pathname;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const publicPath = path.resolve(__dirname, "../public");
 
 app.use(express.static(publicPath));
+
 app.get("/games/:roomCode", (request, response) => {
 	const roomCode = request.params.roomCode as string;
 	if (!/^[A-Z0-9]{4}$/.test(roomCode))
 		return response.status(404).send("Invalid room code format");
-
 	response.sendFile("index.html", { root: publicPath });
 });
 
 io.on("connection", (socket: Socket) => {
 	const gameSocket = socket as GameSocket;
-
 	if (gameSocket.handshake.auth.playerID && gameSocket.handshake.auth.token) {
 		const profile = profiles.get(gameSocket.handshake.auth.playerID);
 		if (profile && profile.auth === gameSocket.handshake.auth.token) {
@@ -48,7 +48,6 @@ io.on("connection", (socket: Socket) => {
 				gameSocket.handshake.auth.playerID,
 				profile.name,
 			);
-
 			gameSocket.emit("sent-player", profile.name);
 		} else {
 			gameSocket.disconnect();
@@ -58,24 +57,16 @@ io.on("connection", (socket: Socket) => {
 		const id = randomPlayerID();
 		const auth = randomAuth();
 		const player = new Player(id);
-
 		gameSocket.player = player;
-		profiles.set(id, {
-			name: player.name,
-			id,
-			auth,
-		});
-
+		profiles.set(id, { name: player.name, id, auth });
 		gameSocket.emit("created-player", id, auth);
 	}
-
 	gameSocket.join(MENU_ROOM);
 	setupHandlers(gameSocket);
 	emitRoomList();
 });
 
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, () => {
 	const startTime = Date.now();
 	console.log(
@@ -84,17 +75,12 @@ server.listen(PORT, () => {
 
 	function writeStatus() {
 		const secondsAgo = Math.floor((Date.now() - startTime) / 1000);
-		const activeRooms = rooms.size;
-		const activePlayers = profiles.size;
-
 		process.stdout.write(
-			`\rUptime: ${secondsAgo}s | Rooms: ${activeRooms} | Players: ${activePlayers}   `,
+			`\rUptime: ${secondsAgo}s | Rooms: ${rooms.size} | Players: ${profiles.size}   `,
 		);
 	}
-
 	writeStatus();
-
-	setInterval(() => writeStatus(), 1000);
+	setInterval(writeStatus, 1000);
 });
 
 setInterval(() => {

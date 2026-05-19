@@ -1,7 +1,17 @@
 import { spawn } from "child_process";
 import * as esbuild from "esbuild";
+import { cpSync, watch as fsWatch } from "node:fs";
+import path from "node:path";
 
 const isWatch = process.argv.includes("--watch");
+
+// Copy all non-TS files from public/ to dist/public/
+const copyPublicAssets = () => {
+	cpSync("public", "dist/public", {
+		recursive: true,
+		filter: (src) => !src.endsWith(".ts"), // skip TS source files
+	});
+};
 
 const commonOptions = {
 	bundle: true,
@@ -11,34 +21,28 @@ const commonOptions = {
 };
 
 let serverProcess = null;
-
 const restartServer = () => {
-	if (serverProcess) {
-		serverProcess.kill();
-	}
+	if (serverProcess) serverProcess.kill();
 	console.clear();
-	serverProcess = spawn(
-		"node",
-		["--no-deprecation", "dist/server/index.js"],
-		{ stdio: "inherit" }
-	);
+	serverProcess = spawn("node", ["--no-deprecation", "dist/server/index.js"], {
+		stdio: "inherit",
+	});
 };
 
 const serverRestartPlugin = {
 	name: "server-restart",
 	setup(build) {
 		build.onEnd((result) => {
-			if (result.errors.length === 0) {
-				restartServer();
-			} else {
-				console.error("<< Server Rebuild Failed >>");
-			}
+			if (result.errors.length === 0) restartServer();
+			else console.error("<< Server Rebuild Failed >>");
 		});
 	},
 };
 
+copyPublicAssets(); // initial copy
+
 const contexts = await Promise.all([
-	// Client/public code
+	// Client code → dist/public/
 	esbuild.context({
 		...commonOptions,
 		entryPoints: ["public/*.ts"],
@@ -46,7 +50,7 @@ const contexts = await Promise.all([
 		format: "esm",
 		platform: "browser",
 	}),
-	// Server code
+	// Server code → dist/server/
 	esbuild.context({
 		...commonOptions,
 		entryPoints: ["server/*.ts"],
@@ -56,7 +60,7 @@ const contexts = await Promise.all([
 		external: ["express", "socket.io"],
 		plugins: isWatch ? [serverRestartPlugin] : [],
 	}),
-	// Shared code
+	// Shared code → dist/shared/
 	esbuild.context({
 		...commonOptions,
 		entryPoints: ["shared/*.ts"],
@@ -69,6 +73,13 @@ const contexts = await Promise.all([
 if (isWatch) {
 	await Promise.all(contexts.map((ctx) => ctx.watch()));
 	restartServer();
+
+	// Watch public/ for asset changes and re-copy
+	fsWatch("public", { recursive: true }, (_, filename) => {
+		if (filename && !filename.endsWith(".ts")) {
+			copyPublicAssets();
+		}
+	});
 
 	process.on("SIGINT", () => {
 		if (serverProcess) serverProcess.kill();
