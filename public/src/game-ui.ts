@@ -9,6 +9,7 @@ import {
 } from "./match-ui";
 import { leaveRoom } from "./menu-ui";
 import { gs } from "./session";
+import { getAssetPath } from "./app-paths";
 
 let gridMode = false;
 
@@ -158,7 +159,7 @@ export function stopPingUpdates(): void {
 // MARK: Audio
 
 export function playAudio(source: string): void {
-    const audio = new Audio("/audio/" + source);
+    const audio = new Audio(getAssetPath(`audio/${source}`));
     console.log(`Playing audio: ${source}`);
     audio.play().catch((error) => console.error("Audio play failed:", error));
 }

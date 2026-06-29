@@ -8,6 +8,7 @@ import {
     updateUIChess,
 } from "./chess-ui";
 import { gs } from "./session";
+import { getAssetPath } from "./app-paths";
 
 export let visualFlipped: boolean = false;
 let intervalID: number;
@@ -174,7 +175,7 @@ function createEmptySlot(boardID: number, color: Color): HTMLElement {
     } else {
         const slot = document.createElement("img");
         slot.className = "player-icon";
-        slot.src = "/img/default-icon.png";
+        slot.src = getAssetPath("img/default-icon.png");
         return slot;
     }
 }
@@ -190,7 +191,7 @@ function createPlayerIcon(
 
     const slot = document.createElement("img");
     slot.className = "player-icon";
-    slot.src = "/img/default-icon.png";
+    slot.src = getAssetPath("img/default-icon.png");
     iconContainer.append(slot);
 
     const shouldShowLeaveButton =

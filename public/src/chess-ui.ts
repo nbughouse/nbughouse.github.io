@@ -14,20 +14,21 @@ import { RoomStatus } from "@shared/room";
 import { playAudio } from "./game-ui";
 import { visualFlipped } from "./match-ui";
 import { gs } from "./session";
+import { getAssetPath } from "./app-paths";
 
 const PIECE_IMAGES = {
-    K: "/pieces/wk.png",
-    Q: "/pieces/wq.png",
-    R: "/pieces/wr.png",
-    B: "/pieces/wb.png",
-    N: "/pieces/wn.png",
-    P: "/pieces/wp.png",
-    k: "/pieces/bk.png",
-    q: "/pieces/bq.png",
-    r: "/pieces/br.png",
-    b: "/pieces/bb.png",
-    n: "/pieces/bn.png",
-    p: "/pieces/bp.png",
+    K: getAssetPath("pieces/wk.png"),
+    Q: getAssetPath("pieces/wq.png"),
+    R: getAssetPath("pieces/wr.png"),
+    B: getAssetPath("pieces/wb.png"),
+    N: getAssetPath("pieces/wn.png"),
+    P: getAssetPath("pieces/wp.png"),
+    k: getAssetPath("pieces/bk.png"),
+    q: getAssetPath("pieces/bq.png"),
+    r: getAssetPath("pieces/br.png"),
+    b: getAssetPath("pieces/bb.png"),
+    n: getAssetPath("pieces/bn.png"),
+    p: getAssetPath("pieces/bp.png"),
 };
 
 // MARK: Global Variables

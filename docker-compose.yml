@@ -1,0 +1,19 @@
+services:
+    bughouse-n-player:
+        build:
+            context: .
+        container_name: bughouse-n-player
+        restart: unless-stopped
+        environment:
+            NODE_ENV: production
+            HOST: 0.0.0.0
+            PORT: 8000
+            FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-https://lualum.github.io}
+        expose:
+            - "8000"
+        networks:
+            - web
+
+networks:
+    web:
+        external: true

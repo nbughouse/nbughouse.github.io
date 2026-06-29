@@ -2,8 +2,8 @@ import type { Server } from "socket.io";
 import type { Color, Move } from "@shared/chess";
 import { PlayerStatus } from "@shared/player";
 import { Room, RoomStatus, Team } from "@shared/room";
-import type { GameSocket } from ".";
-import { emitRoomList, io, MENU_ROOM, rooms } from ".";
+import type { GameSocket } from "./index";
+import { emitRoomList, io, MENU_ROOM, rooms } from "./index";
 
 export function setupHandlers(socket: GameSocket): void {
     socket.on("ping", () => {

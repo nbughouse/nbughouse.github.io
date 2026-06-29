@@ -4,41 +4,25 @@ Browser-based multiplayer bughouse chess with multiple simultaneous boards. The
 client is a Vite TypeScript app, the backend is an Express + Socket.IO server,
 and shared game state lives in `shared/src`.
 
-## Features
+## Hosting Shape
 
-- Create and join four-character room-code lobbies.
-- Join a board seat, ready up, and start once every board seat is filled.
-- Play across multiple linked chess boards. The current room constructor creates
-  three boards by default.
-- Share captured pieces through bughouse-style pockets.
-- Make board moves, pocket drops, premoves, resignations, and timeout wins.
-- Use room chat, live lobby listings, grid/single-board controls, and game audio.
-- Deep-link directly to rooms with `/games/ABCD`.
+- Frontend: GitHub Pages at `https://lualum.github.io/BughouseNPlayer/`
+- Backend: VM-hosted Socket.IO server, defaulting to
+  `https://bughousenplayer.duckdns.org`
+
+GitHub Pages only serves the static frontend. The browser app connects to the VM
+backend with Socket.IO through the `VITE_BACKEND_URL` build setting.
 
 ## Requirements
 
-- Node.js 20 or newer is recommended.
-- `pnpm` is recommended because the root `build` script currently delegates to
-  `pnpm` subcommands.
-
-This repo currently contains both `package-lock.json` and `pnpm-lock.yaml`.
-Pick one package manager for day-to-day work and keep the lockfile strategy
-consistent.
-
-## Install
+- Node.js 20 or newer.
+- `pnpm`, matching Docker and GitHub Actions.
 
 ```bash
+corepack enable
+corepack prepare pnpm@9.15.9 --activate
 pnpm install
 ```
-
-If you prefer npm for local development:
-
-```bash
-npm install
-```
-
-Note that `npm run build` still requires `pnpm` to be available unless the build
-script is changed.
 
 ## Development
 
@@ -55,7 +39,6 @@ http://localhost:3000
 ```
 
 The Vite client runs on port `3000`. The Socket.IO backend runs on port `8000`.
-The current browser session code connects directly to `http://localhost:8000`.
 
 You can also run each side separately:
 
@@ -64,57 +47,116 @@ pnpm run dev:client
 pnpm run dev:server
 ```
 
-## Production Build
+## Build Commands
 
-Build the shared code, client, and server:
+Build the static frontend for GitHub Pages:
+
+```bash
+pnpm run build:pages
+```
+
+This writes `dist/public`, creates `404.html` for direct room links, and adds
+`.nojekyll`.
+
+Build only the VM backend:
+
+```bash
+pnpm run build:backend
+```
+
+Build everything:
 
 ```bash
 pnpm run build
 ```
 
-Start the built server:
+Start the built backend:
 
 ```bash
 pnpm run start
 ```
 
-By default the production server listens on port `8000`. Set `PORT` to override
-that:
+Run the built backend and a local Vite preview together:
 
 ```bash
-PORT=9000 pnpm run start
+pnpm run start:all
 ```
 
-The production server serves the built frontend from `dist/public` and the API
-from the same Express process.
+## Deployment
 
-## Current Build Caveat
+### GitHub Pages Frontend
 
-`package.json` references this step:
+The frontend deploys from `.github/workflows/pages.yml`.
+
+Repository setup:
+
+1. Go to `Settings -> Pages`.
+2. Set `Build and deployment -> Source` to `GitHub Actions`.
+3. Push to `main`.
+
+The workflow installs dependencies with pnpm, runs:
 
 ```bash
-node scripts/fix-esm-relative-imports.mjs dist/shared
+pnpm run build:pages
 ```
 
-At the time this README was created, the repo does not include a `scripts/`
-directory, so a full `pnpm run build` will fail until that helper is restored or
-the build step is updated. The targeted scripts are still useful while working:
+and deploys `dist/public` as the Pages artifact.
+
+Default frontend build environment:
+
+```text
+VITE_BACKEND_URL=https://bughousenplayer.duckdns.org
+VITE_BASE_PATH=/BughouseNPlayer/
+```
+
+If the backend VM uses a different hostname, set the repository variable
+`VITE_BACKEND_URL`. If the Pages site moves to a root or custom domain, set
+`VITE_BASE_PATH` accordingly.
+
+### VM Backend
+
+The backend deploys from `.github/workflows/deploy.yml`.
+
+Required GitHub secrets:
+
+```text
+VM_HOST
+VM_USER
+VM_SSH_KEY
+```
+
+On push to `main`, the workflow SSHes into the VM, clones or refreshes the repo
+under `/opt/BughouseNPlayer`, rebuilds the Docker image, and runs:
 
 ```bash
-pnpm run build:shared
-pnpm run build:client
-pnpm run build:server
+docker compose up -d --build --remove-orphans
 ```
+
+The Docker container builds only the backend and exposes port `8000` inside the
+external `web` Docker network.
+
+Default backend environment:
+
+```text
+NODE_ENV=production
+PORT=8000
+FRONTEND_ORIGIN=https://lualum.github.io
+```
+
+Your VM reverse proxy should route the public backend hostname's `/socket.io`
+traffic to the backend container on port `8000`.
+
+The backend allows `FRONTEND_ORIGIN` and comma-separated `ALLOWED_ORIGINS`
+overrides for Socket.IO CORS if the public frontend URL changes.
 
 ## Project Layout
 
 ```text
-public/           Vite frontend app, styles, images, pieces, and audio
-public/src/       Browser session, menu, game UI, board UI, and socket handlers
-server/src/       Express server, Socket.IO setup, room events, and timers
-shared/src/       Chess rules, room state, player state, chat, and config types
-dist/             Generated build output
-github/deploy.yml VM deployment workflow
+public/       Vite frontend app, styles, images, pieces, and audio
+server/       Express server, Socket.IO setup, room events, and timers
+shared/       Shared chess rules, room state, player state, chat, and config
+scripts/      Build helper scripts
+dist/         Generated build output
 ```
 
 ## Gameplay Flow
@@ -128,9 +170,10 @@ github/deploy.yml VM deployment workflow
    eligible boards.
 7. A room ends on checkmate, resignation, or timeout.
 
-## Deployment Notes
+## Notes
 
-The included `github/deploy.yml` workflow connects to a VM over SSH, updates
-`/opt/Bughouse`, installs dependencies, builds, and restarts a `bughouse`
-systemd service. Make sure the VM has the package manager required by the
-current build script.
+- Do not commit `dist/`; it is generated by the build workflows.
+- Direct room links work on Pages because `build:pages` creates `404.html` as an
+  SPA fallback.
+- Browser asset and room paths are based on `VITE_BASE_PATH`, so project Pages
+  hosting under `/BughouseNPlayer/` works without rewriting source paths.

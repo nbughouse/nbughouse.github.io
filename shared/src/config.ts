@@ -1,3 +1,8 @@
+export const config = {
+    clientPort: 3000,
+    serverPort: 8000,
+};
+
 export type TimeType = "increment" | "delay";
 export type InitialBoard = "default" | "960";
 export type PocketShare = "color" | "shared" | "none";

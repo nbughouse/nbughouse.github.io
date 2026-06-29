@@ -1,27 +1,35 @@
 import { checkAndPromptForName } from "./menu-ui";
 import { sn } from "./session";
+import { getAppPathname, getBasePath, getRoomPath } from "./app-paths";
 
 export function checkURLForRoom(): void {
-    // Extract room code from path like /games/ABCD
-    const pathParts = globalThis.location.pathname.split("/");
-    const roomCode = pathParts[2]; // Assuming /games/ROOMCODE structure
+    const roomCode = getRoomCodeFromPath();
 
     if (
         roomCode &&
         roomCode.length === 4 &&
         checkAndPromptForName(() => {
-            // Remove URL extension
-            globalThis.history.replaceState({}, "", "/");
+            clearRoomURL();
             sn.socket.emit("join-room", roomCode);
         })
     ) {
-        // If name is already set, join immediately
-        globalThis.history.replaceState({}, "", "/");
+        clearRoomURL();
         sn.socket.emit("join-room", roomCode);
     }
 }
 
 export function updateURL(roomCode: string): void {
-    const newPath = `/games/${roomCode}`;
-    globalThis.history.replaceState({}, "", newPath);
+    globalThis.history.replaceState({}, "", getRoomPath(roomCode));
+}
+
+export function clearRoomURL(): void {
+    globalThis.history.replaceState({}, "", getBasePath());
+}
+
+function getRoomCodeFromPath(): string | undefined {
+    const pathParts = getAppPathname()
+        .split("/")
+        .filter(Boolean);
+
+    return pathParts[0] === "games" ? pathParts[1] : undefined;
 }

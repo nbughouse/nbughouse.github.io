@@ -2,6 +2,7 @@ import type { RoomListing } from "@shared/room";
 import { stopPingUpdates } from "./game-ui";
 import { stopTimeUpdates } from "./match-ui";
 import { sn } from "./session";
+import { getBasePath } from "./app-paths";
 
 // Store the pending action
 let pendingAction: (() => void) | undefined;
@@ -217,7 +218,7 @@ function setupNameInput(elementId: string) {
 }
 
 export function leaveRoom(): void {
-    globalThis.history.replaceState({}, "", globalThis.location.pathname);
+    globalThis.history.replaceState({}, "", getBasePath());
     sn.socket.emit("leave-room");
     showMenuScreen();
 }

@@ -1,20 +1,21 @@
 import express from "express";
 import { setupHandlers } from "./handlers";
 import { randomBytes } from "node:crypto";
+import fs from "node:fs";
 import http from "node:http";
 import { Server, Socket } from "socket.io";
+import { config } from "@shared/config";
 import { Player } from "@shared/player";
 import type { Room } from "@shared/room";
 import { RoomStatus, Team } from "@shared/room";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createServer } from "vite";
 
 const app = express();
 const httpServer = http.createServer(app);
 export const io = new Server(httpServer, {
     cors: {
-        origin: true,
+        origin: isAllowedOrigin,
         credentials: true,
     },
 });
@@ -34,32 +35,55 @@ export interface Profile {
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const publicPath = path.resolve(__dirname, "../public");
-const isDevelopment = process.env.NODE_ENV === "development";
+const repoRoot = path.resolve(__dirname, "../..");
+const devPublicPath = path.resolve(__dirname, "../../public");
+const prodPublicPath = path.resolve(__dirname, "../public");
+const hasBuiltClient = fs.existsSync(path.join(prodPublicPath, "index.html"));
+const shouldUseDevClient =
+    process.env.NODE_ENV !== "production" &&
+    fs.existsSync(path.join(devPublicPath, "index.html"));
+const publicPath = hasBuiltClient ? prodPublicPath : devPublicPath;
+const sharedSrcPath = path.resolve(repoRoot, "shared/src");
 
-// Setup Vite in dev, static serving in production
-if (isDevelopment) {
+if (shouldUseDevClient && !hasBuiltClient) {
+    const { createServer } = await import("vite");
     const vite = await createServer({
-        server: { middlewareMode: true },
-        appType: "spa",
         root: publicPath,
+        resolve: {
+            alias: {
+                "@shared": sharedSrcPath,
+            },
+        },
+        server: {
+            middlewareMode: true,
+            fs: {
+                allow: [repoRoot],
+            },
+        },
+        appType: "spa",
     });
     app.use(vite.middlewares);
+} else if (hasBuiltClient) {
+    app.use("/audio", express.static(path.join(publicPath, "audio")));
+    app.use("/img", express.static(path.join(publicPath, "img")));
+    app.use("/pieces", express.static(path.join(publicPath, "pieces")));
+    app.use(express.static(publicPath));
 } else {
-    app.use(express.static(path.resolve(__dirname, "../public")));
+    app.get("/", (_request, response) => {
+        response.send("Bughouse N Player backend is running. Frontend is hosted separately.");
+    });
 }
 
 app.get("/games/:roomCode", (request, response) => {
     const roomCode = request.params.roomCode as string;
     if (!/^[A-Z0-9]{4}$/.test(roomCode))
         return response.status(404).send("Invalid room code format");
-    if (isDevelopment) {
-        response.sendFile("index.html", { root: publicPath });
-    } else {
-        response.sendFile("index.html", {
-            root: path.resolve(__dirname, "../public"),
-        });
+
+    if (!shouldUseDevClient && !hasBuiltClient) {
+        return response.status(404).send("Frontend is hosted separately");
     }
+
+    response.sendFile("index.html", { root: publicPath });
 });
 
 io.on("connection", (socket: Socket) => {
@@ -89,7 +113,7 @@ io.on("connection", (socket: Socket) => {
     emitRoomList();
 });
 
-const PORT = process.env.PORT || 8000;
+const PORT = Number(process.env.PORT) || config.serverPort;
 httpServer.listen(PORT, () => {
     const startTime = Date.now();
     console.log(
@@ -98,12 +122,12 @@ httpServer.listen(PORT, () => {
 
     function writeStatus() {
         const secondsAgo = Math.floor((Date.now() - startTime) / 1000);
-        process.stdout.write(
-            `\rUptime: ${secondsAgo}s | Rooms: ${rooms.size} | Players: ${profiles.size}   `,
+        console.log(
+            `Uptime: ${secondsAgo}s | Rooms: ${rooms.size} | Players: ${profiles.size}`,
         );
     }
     writeStatus();
-    setInterval(writeStatus, 1000);
+    setInterval(writeStatus, 5000);
 });
 
 setInterval(() => {
@@ -141,4 +165,57 @@ export function emitRoomList(): void {
         "listed-rooms",
         [...rooms.values()].map((room) => room.getRoomListing()),
     );
+}
+
+function isAllowedOrigin(
+    origin: string | undefined,
+    callback: (error: Error | null, allow?: boolean) => void,
+): void {
+    if (!origin) {
+        callback(null, true);
+        return;
+    }
+
+    if (getAllowedOrigins().has(origin)) {
+        callback(null, true);
+        return;
+    }
+
+    callback(new Error("Origin not allowed"));
+}
+
+function getAllowedOrigins(): Set<string> {
+    const origins = new Set([
+        "https://lualum.github.io",
+        "https://bughousenplayer.duckdns.org",
+        `http://localhost:${config.clientPort}`,
+        `http://127.0.0.1:${config.clientPort}`,
+        `http://localhost:${config.serverPort}`,
+        `http://127.0.0.1:${config.serverPort}`,
+    ]);
+
+    addConfiguredOrigins(origins, process.env.FRONTEND_ORIGIN);
+    addConfiguredOrigins(origins, process.env.ALLOWED_ORIGINS);
+
+    return origins;
+}
+
+function addConfiguredOrigins(origins: Set<string>, value: string | undefined): void {
+    if (!value) return;
+
+    for (const rawOrigin of value.split(",")) {
+        const origin = normalizeOrigin(rawOrigin);
+        if (origin) origins.add(origin);
+    }
+}
+
+function normalizeOrigin(rawOrigin: string): string | undefined {
+    const trimmed = rawOrigin.trim();
+    if (!trimmed) return undefined;
+
+    try {
+        return new URL(trimmed).origin;
+    } catch {
+        return trimmed.replace(/\/+$/, "");
+    }
 }

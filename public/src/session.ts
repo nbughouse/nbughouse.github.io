@@ -1,5 +1,6 @@
-import type { Socket } from "socket.io-client";
+import type { ManagerOptions, Socket, SocketOptions } from "socket.io-client";
 import { io } from "socket.io-client";
+import { config } from "@shared/config";
 import { Player } from "@shared/player";
 import type { Room } from "@shared/room";
 import { Settings } from "./settings";
@@ -12,15 +13,7 @@ export class Session {
     settings: Settings;
 
     constructor(id?: string, auth?: string) {
-        this.socket =
-            id && auth
-                ? io("http://localhost:8000", {
-                      auth: {
-                          playerID: id,
-                          token: auth,
-                      },
-                  })
-                : io("http://localhost:8000");
+        this.socket = io(getSocketUrl(), getSocketOptions(id, auth));
 
         this.room = undefined;
         this.player = id ? new Player(id) : undefined;
@@ -64,6 +57,34 @@ export class Session {
         this.player = undefined;
         this.auth = "";
     }
+}
+
+function getSocketUrl(): string {
+    const configuredBackendUrl = import.meta.env.VITE_BACKEND_URL?.trim();
+    if (configuredBackendUrl) return configuredBackendUrl.replace(/\/+$/, "");
+
+    if (globalThis.location.port === String(config.clientPort)) {
+        return `${globalThis.location.protocol}//${globalThis.location.hostname}:${config.serverPort}`;
+    }
+
+    return globalThis.location.origin;
+}
+
+function getSocketOptions(
+    playerID: string | undefined,
+    token: string | undefined,
+): Partial<ManagerOptions & SocketOptions> {
+    const options: Partial<ManagerOptions & SocketOptions> = {
+        transports: ["websocket", "polling"],
+        tryAllTransports: true,
+        upgrade: false,
+    };
+
+    if (playerID && token) {
+        options.auth = { playerID, token };
+    }
+
+    return options;
 }
 
 export function initSession() {
