@@ -1,24 +1,26 @@
 # Bughouse N Player
 
-Browser-based multiplayer bughouse chess with multiple simultaneous boards. The
-client is a Vite TypeScript app, the backend is an Express + Socket.IO server,
-and shared game state lives in `shared/src`.
+Browser-based multiplayer bughouse chess with support for multiple simultaneous
+boards. The frontend is a Vite TypeScript app, the backend is an Express and
+Socket.IO server, and shared game state lives in `shared/src`.
 
-## Hosting Shape
+## Live Setup
 
-- Frontend: GitHub Pages at `https://nbughouse.github.io/nbughouse/` for the
-  current `nbughouse/nbughouse` repo, or `https://nbughouse.github.io/` if the
-  repo is renamed/moved to `nbughouse.github.io` like CardsMP.
-- Backend: VM-hosted Socket.IO server, defaulting to
-  `https://nbughouse.duckdns.org`
+The app is deployed as two pieces:
 
-GitHub Pages only serves the static frontend. The browser app connects to the VM
-backend with Socket.IO through the `VITE_BACKEND_URL` build setting.
+- Frontend: GitHub Pages, currently expected at
+  `https://nbughouse.github.io/nbughouse/` for the `nbughouse/nbughouse` repo.
+- Backend: VM-hosted Socket.IO server at `https://nbughouse.duckdns.org`.
+
+GitHub Pages serves only the static browser app. The browser connects to the VM
+backend through `VITE_BACKEND_URL`, which is compiled into the frontend during
+the Pages build.
 
 ## Requirements
 
 - Node.js 20 or newer.
-- `pnpm`, matching Docker and GitHub Actions.
+- `pnpm` through Corepack.
+- Docker and Docker Compose for the VM backend deployment.
 
 ```bash
 corepack enable
@@ -28,7 +30,7 @@ pnpm install
 
 ## Development
 
-Start the client and server together:
+Run the local backend and Vite frontend together:
 
 ```bash
 pnpm run dev
@@ -40,9 +42,12 @@ Then open:
 http://localhost:3000
 ```
 
-The Vite client runs on port `3000`. The Socket.IO backend runs on port `8000`.
+Local ports:
 
-You can also run each side separately:
+- Frontend: `3000`
+- Backend: `8000`
+
+You can also run each process separately:
 
 ```bash
 pnpm run dev:client
@@ -51,14 +56,14 @@ pnpm run dev:server
 
 ## Build Commands
 
-Build the static frontend for GitHub Pages:
+Build the GitHub Pages frontend:
 
 ```bash
 pnpm run build:pages
 ```
 
-This writes `dist/public`, creates `404.html` for direct room links, and adds
-`.nojekyll`.
+This writes `dist/public`, copies static `audio`, `img`, and `pieces` assets,
+creates `404.html` for direct room links, and adds `.nojekyll`.
 
 Build only the VM backend:
 
@@ -84,11 +89,41 @@ Run the built backend and a local Vite preview together:
 pnpm run start:all
 ```
 
+Clean generated output:
+
+```bash
+pnpm run clean
+```
+
+## Configuration
+
+Frontend build variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `VITE_BACKEND_URL` | `https://nbughouse.duckdns.org` | Public Socket.IO backend URL used by the browser. |
+| `VITE_BASE_PATH` | Derived by the Pages workflow | Base path for static assets and room URLs. |
+
+The Pages workflow derives `VITE_BASE_PATH` from the repository name. A project
+site such as `nbughouse/nbughouse` uses `/nbughouse/`. A root
+`<owner>.github.io` repository uses `/`. Set the repository variable
+`VITE_BASE_PATH` only when GitHub Pages is configured with a custom path or
+domain.
+
+Backend variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `NODE_ENV` | `production` in Docker | Enables production behavior in the container. |
+| `PORT` | `8000` | Backend listen port. |
+| `FRONTEND_ORIGIN` | `https://nbughouse.github.io` | Primary allowed browser origin for Socket.IO CORS. |
+| `ALLOWED_ORIGINS` | unset | Optional comma-separated extra allowed origins. |
+
 ## Deployment
 
 ### GitHub Pages Frontend
 
-The frontend deploys from `.github/workflows/pages.yml`.
+The frontend deploys from `.github/workflows/pages.yml` on pushes to `main`.
 
 Repository setup:
 
@@ -96,31 +131,12 @@ Repository setup:
 2. Set `Build and deployment -> Source` to `GitHub Actions`.
 3. Push to `main`.
 
-The workflow installs dependencies with pnpm, runs:
-
-```bash
-pnpm run build:pages
-```
-
-and deploys `dist/public` as the Pages artifact.
-
-Default frontend build environment:
-
-```text
-VITE_BACKEND_URL=https://nbughouse.duckdns.org
-VITE_BASE_PATH=/nbughouse/ for nbughouse/nbughouse
-VITE_BASE_PATH=/ for nbughouse/nbughouse.github.io
-```
-
-If the backend VM uses a different hostname, set the repository variable
-`VITE_BACKEND_URL`. The workflow derives `VITE_BASE_PATH` from the repository
-name by default: `/<repo>/` for project Pages and `/` for a root
-`<owner>.github.io` repo. Set the repository variable `VITE_BASE_PATH` only if
-GitHub Pages is configured with a custom path/domain.
+The workflow installs dependencies with pnpm, runs `pnpm run build:pages`, and
+deploys `dist/public` as the Pages artifact.
 
 ### VM Backend
 
-The backend deploys from `.github/workflows/deploy.yml`.
+The backend deploys from `.github/workflows/deploy.yml` on pushes to `main`.
 
 Required GitHub secrets:
 
@@ -130,32 +146,22 @@ VM_USER
 VM_SSH_KEY
 ```
 
-On push to `main`, the workflow SSHes into the VM, clones or refreshes the repo
-under `/opt/BughouseNPlayer`, rebuilds the Docker image, and runs:
+The workflow SSHes into the VM, keeps the checkout under
+`/opt/BughouseNPlayer`, rebuilds the Docker image, and runs:
 
 ```bash
 docker compose up -d --build --remove-orphans
 ```
 
-The Docker container builds only the backend and exposes port `8000` inside the
-external `web` Docker network.
-
 If `/opt/BughouseNPlayer` already exists but is not a Git checkout, the workflow
 moves it aside as `/opt/BughouseNPlayer.backup.<timestamp>` before cloning.
 
-Default backend environment:
+The Docker service is named `bughouse-n-player`, exposes port `8000` inside the
+external `web` Docker network, and expects the VM reverse proxy to route:
 
 ```text
-NODE_ENV=production
-PORT=8000
-FRONTEND_ORIGIN=https://nbughouse.github.io
+https://nbughouse.duckdns.org/socket.io -> bughouse-n-player:8000/socket.io
 ```
-
-Your VM reverse proxy should route the public backend hostname's `/socket.io`
-traffic to the backend container on port `8000`.
-
-The backend allows `FRONTEND_ORIGIN` and comma-separated `ALLOWED_ORIGINS`
-overrides for Socket.IO CORS if the public frontend URL changes.
 
 ## Project Layout
 
@@ -174,14 +180,19 @@ dist/         Generated build output
 3. Pick open board seats with the `[+]` buttons.
 4. Ready up once all seats are assigned.
 5. The room starts automatically when every seated player is ready.
-6. Captures are added to teammate pockets, and pocket pieces can be dropped on
-   eligible boards.
-7. A room ends on checkmate, resignation, or timeout.
+6. Captures are added to teammate pockets.
+7. Pocket pieces can be dropped on eligible boards.
+8. A room ends on checkmate, resignation, or timeout.
+
+The current room model creates three boards by default. Every seat on every
+board must be occupied and ready before the room starts.
 
 ## Notes
 
-- Do not commit `dist/`; it is generated by the build workflows.
-- Direct room links work on Pages because `build:pages` creates `404.html` as an
-  SPA fallback.
-- Browser asset and room paths are based on `VITE_BASE_PATH`, so root Pages
-  hosting and project Pages hosting both work without rewriting source paths.
+- Do not commit `dist/`; it is generated by local builds and workflows.
+- Direct room links work on GitHub Pages because `build:pages` creates
+  `404.html` as an SPA fallback.
+- Browser asset paths and room URLs are based on `VITE_BASE_PATH`.
+- The frontend reconnects with stored session credentials when possible; if the
+  backend has restarted and the old credentials are stale, it creates a fresh
+  profile.
