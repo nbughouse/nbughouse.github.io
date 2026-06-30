@@ -31,6 +31,8 @@ import { updateURL } from "./url";
 export function initGameSocket(): void {
     gs.socket.on("sent-player", (name: string) => {
         gs.player.name = name;
+        gs.name = name;
+        sessionStorage.setItem("name", name);
     });
 
     gs.socket.on("joined-room", (raw: SerializedRoom) => {

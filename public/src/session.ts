@@ -10,14 +10,18 @@ export class Session {
     room: Room | undefined;
     player: Player | undefined;
     auth: string;
+    name: string;
     settings: Settings;
 
     constructor(id?: string, auth?: string) {
+        const storedName =
+            globalThis.sessionStorage?.getItem("name") || undefined;
         this.socket = io(getSocketUrl(), getSocketOptions(id, auth));
 
         this.room = undefined;
-        this.player = id ? new Player(id) : undefined;
+        this.player = id ? new Player(id, storedName) : undefined;
         this.auth = auth || "";
+        this.name = storedName || "";
         this.settings = new Settings();
 
         if (this.settings.logSocket) {
@@ -56,6 +60,10 @@ export class Session {
         this.room = undefined;
         this.player = undefined;
         this.auth = "";
+        this.name = "";
+        globalThis.sessionStorage?.removeItem("id");
+        globalThis.sessionStorage?.removeItem("auth");
+        globalThis.sessionStorage?.removeItem("name");
     }
 }
 
@@ -88,15 +96,10 @@ function getSocketOptions(
 }
 
 export function initSession() {
-    // const id = sessionStorage.getItem("id");
-    // const auth = sessionStorage.getItem("auth");
+    const id = globalThis.sessionStorage?.getItem("id") || undefined;
+    const auth = globalThis.sessionStorage?.getItem("auth") || undefined;
 
-    // if (id && auth) {
-    //    session = new Session(id, auth);
-    // } else {
-    //    session = new Session();
-    // }
-    sn = new Session();
+    sn = new Session(id, auth);
     gs = sn as GameSession;
     return sn;
 }

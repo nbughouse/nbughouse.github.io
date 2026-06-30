@@ -3,7 +3,7 @@ import type { Color, Move } from "@shared/chess";
 import { PlayerStatus } from "@shared/player";
 import { Room, RoomStatus, Team } from "@shared/room";
 import type { GameSocket } from "./index";
-import { emitRoomList, io, MENU_ROOM, rooms } from "./index";
+import { emitRoomList, io, MENU_ROOM, profiles, rooms } from "./index";
 
 export function setupHandlers(socket: GameSocket): void {
     socket.on("ping", () => {
@@ -11,7 +11,16 @@ export function setupHandlers(socket: GameSocket): void {
     });
 
     socket.on("set-name", (name: string) => {
-        socket.player.name = name.trim().slice(0, 20);
+        const trimmedName = name.trim().slice(0, 20);
+        if (!trimmedName) return;
+
+        socket.player.name = trimmedName;
+
+        const profile = profiles.get(socket.player.id);
+        if (profile) profile.name = trimmedName;
+
+        const roomPlayer = socket.room?.players.get(socket.player.id);
+        if (roomPlayer) roomPlayer.name = trimmedName;
     });
 
     socket.on("create-room", () => {

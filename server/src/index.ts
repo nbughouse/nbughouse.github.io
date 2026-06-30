@@ -88,25 +88,23 @@ app.get("/games/:roomCode", (request, response) => {
 
 io.on("connection", (socket: Socket) => {
     const gameSocket = socket as GameSocket;
-    if (gameSocket.handshake.auth.playerID && gameSocket.handshake.auth.token) {
-        const profile = profiles.get(gameSocket.handshake.auth.playerID);
-        if (profile && profile.auth === gameSocket.handshake.auth.token) {
-            gameSocket.player = new Player(
-                gameSocket.handshake.auth.playerID,
-                profile.name,
-            );
+    const handshakePlayerID = gameSocket.handshake.auth.playerID as
+        | string
+        | undefined;
+    const handshakeToken = gameSocket.handshake.auth.token as
+        | string
+        | undefined;
+
+    if (handshakePlayerID && handshakeToken) {
+        const profile = profiles.get(handshakePlayerID);
+        if (profile && profile.auth === handshakeToken) {
+            gameSocket.player = new Player(handshakePlayerID, profile.name);
             gameSocket.emit("sent-player", profile.name);
         } else {
-            gameSocket.disconnect();
-            return;
+            issueFreshProfile(gameSocket);
         }
     } else {
-        const id = randomPlayerID();
-        const auth = randomAuth();
-        const player = new Player(id);
-        gameSocket.player = player;
-        profiles.set(id, { name: player.name, id, auth });
-        gameSocket.emit("created-player", id, auth);
+        issueFreshProfile(gameSocket);
     }
     gameSocket.join(MENU_ROOM);
     setupHandlers(gameSocket);
@@ -160,6 +158,16 @@ function randomAuth(): string {
     return randomBytes(32).toString("hex");
 }
 
+function issueFreshProfile(socket: GameSocket): void {
+    const id = randomPlayerID();
+    const auth = randomAuth();
+    const player = new Player(id);
+
+    socket.player = player;
+    profiles.set(id, { name: player.name, id, auth });
+    socket.emit("created-player", id, auth);
+}
+
 export function emitRoomList(): void {
     io.to(MENU_ROOM).emit(
         "listed-rooms",
@@ -186,7 +194,7 @@ function isAllowedOrigin(
 
 function getAllowedOrigins(): Set<string> {
     const origins = new Set([
-        "https://lualum.github.io",
+        "https://nbughouse.github.io",
         "https://nbughouse.duckdns.org",
         `http://localhost:${config.clientPort}`,
         `http://127.0.0.1:${config.clientPort}`,

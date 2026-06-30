@@ -57,7 +57,7 @@ export function checkAndPromptForName(action: () => void): boolean {
     const nameInput = document.querySelector(
         "#player-name-input",
     ) as HTMLInputElement;
-    const currentName = nameInput.value.trim() || "";
+    const currentName = nameInput.value.trim() || sn.name.trim();
 
     if (!currentName) {
         pendingAction = action;
@@ -65,6 +65,7 @@ export function checkAndPromptForName(action: () => void): boolean {
         return false;
     }
 
+    if (!nameInput.value.trim()) nameInput.value = currentName;
     return true;
 }
 
@@ -101,7 +102,7 @@ function setupNameModal(): void {
 
             mainInput.value = name;
 
-            sn.socket.emit("set-name", name);
+            setPlayerName(name);
             hideNameModal();
 
             // Execute the pending action
@@ -203,7 +204,14 @@ function hideJoinModal(): void {
 function handleNameSubmit(event: Event): void {
     const target = event.target as HTMLInputElement;
     const name = target.value.trim();
-    if (name) sn.socket.emit("set-name", name);
+    if (name) setPlayerName(name);
+}
+
+function setPlayerName(name: string): void {
+    sn.name = name;
+    if (sn.player) sn.player.name = name;
+    sessionStorage.setItem("name", name);
+    sn.socket.emit("set-name", name);
 }
 
 function setupNameInput(elementId: string) {
