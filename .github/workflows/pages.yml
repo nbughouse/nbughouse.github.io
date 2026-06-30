@@ -18,7 +18,7 @@ jobs:
     build:
         runs-on: ubuntu-latest
         env:
-            VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL || 'https://bughousenplayer.duckdns.org' }}
+            VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL || 'https://nbughouse.duckdns.org' }}
             VITE_BASE_PATH: ${{ vars.VITE_BASE_PATH || '/BughouseNPlayer/' }}
         steps:
             - uses: actions/checkout@v4

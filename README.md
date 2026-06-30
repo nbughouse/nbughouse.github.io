@@ -8,7 +8,7 @@ and shared game state lives in `shared/src`.
 
 - Frontend: GitHub Pages at `https://lualum.github.io/BughouseNPlayer/`
 - Backend: VM-hosted Socket.IO server, defaulting to
-  `https://bughousenplayer.duckdns.org`
+  `https://nbughouse.duckdns.org`
 
 GitHub Pages only serves the static frontend. The browser app connects to the VM
 backend with Socket.IO through the `VITE_BACKEND_URL` build setting.
@@ -105,7 +105,7 @@ and deploys `dist/public` as the Pages artifact.
 Default frontend build environment:
 
 ```text
-VITE_BACKEND_URL=https://bughousenplayer.duckdns.org
+VITE_BACKEND_URL=https://nbughouse.duckdns.org
 VITE_BASE_PATH=/BughouseNPlayer/
 ```
 
