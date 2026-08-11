@@ -174,6 +174,7 @@ export function initGameSocket(): void {
         clearLastMoves();
         endGameUI();
         stopTimeUpdates();
+        updateUITime();
         updateUIPlayerList();
         updateUIPushChat({
             id: "server",

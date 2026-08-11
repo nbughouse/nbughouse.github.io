@@ -354,21 +354,23 @@
 }
 
 .player-time-display.white-clock {
-   background: #ffffff;
-   color: #62605e;
+   background: #979695;
+   color: #62605E;
 }
 
 .player-time-display.black-clock {
-   background: #2b2926;
-   color: #82807f;
+   background: #2B2926;
+   color: #82807F;
 }
 
 .player-time-display.white-clock.active-clock {
-   color: #262421;
+   background: #FFFFFF;
+   color: #302E2B;
 }
 
 .player-time-display.black-clock.active-clock {
-   color: #ffffff;
+   background: #2B2926;
+   color: #82807F;
 }
 
 .clock-value {
@@ -377,9 +379,7 @@
 }
 
 .player-info.active-player .player-time-display {
-   box-shadow:
-      var(--shadow-button),
-      inset 0 calc(var(--square-size) * -0.035) 0 var(--green);
+   box-shadow: var(--shadow-button);
 }
 
 .player-info.own-player-seat {

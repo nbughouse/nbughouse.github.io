@@ -245,11 +245,8 @@ function updateTimeDisplay(
 
     const playing =
         gs.room.status === RoomStatus.PLAYING &&
-        color !== getMatchInstance(boardID).chess.turn;
-    timeDisplay.classList.toggle(
-        "active-clock",
-        playing || gs.room.status === RoomStatus.LOBBY,
-    );
+        color === getMatchInstance(boardID).chess.turn;
+    timeDisplay.classList.toggle("active-clock", playing);
     playerInfo.classList.toggle("active-player", playing);
 }
 

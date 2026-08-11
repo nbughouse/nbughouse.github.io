@@ -744,11 +744,29 @@ export function updateUIPushChat(message: ChatMessage): void {
     } ${message.id === "server" ? "server" : ""}`.trim();
 
     const senderName = getSenderName();
+    const previousMessage = chatMessagesDiv.lastElementChild as HTMLElement | null;
 
-    messageDiv.innerHTML = `
-      <div class="chat-sender">${senderName}</div>
-      <div class="chat-text">${escapeHtml(message.message)}</div>
-    `;
+    if (previousMessage?.dataset.senderId === message.id) {
+        const text = previousMessage.querySelector(".chat-text");
+        if (text)
+            text.textContent = text.textContent
+                ? `${text.textContent}\n${message.message}`
+                : message.message;
+        chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+        return;
+    }
+
+    messageDiv.dataset.senderId = message.id;
+
+    const senderDiv = document.createElement("div");
+    senderDiv.className = "chat-sender";
+    senderDiv.textContent = senderName;
+
+    const textDiv = document.createElement("div");
+    textDiv.className = "chat-text";
+    textDiv.textContent = message.message;
+
+    messageDiv.append(senderDiv, textDiv);
     chatMessagesDiv.append(messageDiv);
     chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
 }
@@ -1026,13 +1044,4 @@ export function endGameUI(): void {
     updateUIAllGame();
     updateUIPlayerList();
     updateRoomSettingsUI();
-}
-
-function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
 }

@@ -9,7 +9,7 @@
    box-shadow: 0.9vh 0 2.4vh rgba(0, 0, 0, 0.22);
    background: var(--secondary);
    padding: 0;
-   width: calc(30vh + 2px);
+   width: calc(32vh + 2px);
    height: 100vh;
 }
 
@@ -37,7 +37,7 @@
    box-shadow: none;
    color: var(--text);
    font-weight: var(--font-weight-bold);
-   font-size: 2.25vh;
+   font-size: 2.5vh;
    line-height: 1;
    text-overflow: ellipsis;
 }
@@ -122,7 +122,7 @@
 }
 
 .ping-text {
-   font-size: 1.25vh;
+   font-size: 1.4vh;
    text-align: center;
 }
 
@@ -163,7 +163,7 @@
    border-radius: var(--radius-sm);
    background: transparent;
    padding: 0.75vh 0;
-   font-size: 1.5vh;
+   font-size: 1.7vh;
    box-shadow: none;
    color: var(--hidden-text);
    transition: color 180ms ease;
@@ -203,7 +203,7 @@
    background: var(--surface);
    padding: 0.85vh 1vh;
    font-weight: var(--font-weight-bold);
-   font-size: 1.625vh;
+   font-size: 1.85vh;
    line-height: 1.1;
    box-shadow: var(--shadow-button);
 }
@@ -249,7 +249,7 @@
    padding: 0.9vh 1vh;
    width: 100%;
    font-weight: var(--font-weight-bold);
-   font-size: 1.5vh;
+   font-size: 1.7vh;
    box-shadow: var(--shadow-button);
 }
 
@@ -263,7 +263,7 @@
    align-items: center;
    gap: 1vh;
    font-weight: var(--font-weight-bold);
-   font-size: 1.625vh;
+   font-size: 1.85vh;
 }
 
 .settings-field input,
@@ -275,7 +275,7 @@
    width: 100%;
    min-width: 0;
    color: inherit;
-   font-size: 1.625vh;
+   font-size: 1.85vh;
    box-shadow: var(--shadow-button);
 }
 
@@ -322,7 +322,7 @@
    height: 100%;
    color: inherit;
    font-weight: var(--font-weight-bold);
-   font-size: 1.45vh;
+   font-size: 1.65vh;
    line-height: 1.1;
    text-align: left;
    white-space: nowrap;
@@ -379,7 +379,7 @@
    padding: 0.75vh 0.9vh;
    color: inherit;
    font-weight: var(--font-weight-bold);
-   font-size: 1.45vh;
+   font-size: 1.65vh;
    line-height: 1.1;
    text-align: left;
 }
@@ -421,7 +421,7 @@
    padding: 0.7vh;
    min-width: 0;
    font-weight: var(--font-weight-bold);
-   font-size: 1.34vh;
+   font-size: 1.5vh;
    line-height: 1.1;
    box-shadow: var(--shadow-button);
 }
@@ -441,6 +441,12 @@
    justify-content: flex-start;
 }
 
+.shared-team-clock-toggle {
+   justify-content: center;
+   background: transparent;
+   box-shadow: none;
+}
+
 .settings-field-wide {
    grid-template-columns: 1fr;
    align-items: stretch;
@@ -455,7 +461,7 @@
 #room-settings-note {
    min-height: 3.5vh;
    color: var(--hidden-text);
-   font-size: 1.45vh;
+   font-size: 1.6vh;
    line-height: 1.25;
 }
 
@@ -474,7 +480,7 @@
    padding: 1vh 0;
    width: calc(100% - (var(--sidebar-margin) * 2));
    font-weight: var(--font-weight-bold);
-   font-size: 1.75vh;
+   font-size: 2vh;
 }
 
 #ready-btn.waiting,
@@ -494,7 +500,7 @@
    padding: 1vh 0;
    width: calc(100% - (var(--sidebar-margin) * 2));
    font-weight: var(--font-weight-bold);
-   font-size: 1.75vh;
+   font-size: 2vh;
 }
 
 /* Chat Section */
@@ -523,7 +529,7 @@
    border: none;
    border-radius: var(--radius-md);
    padding: 1vh 1.5vh;
-   font-size: 1.625vh;
+   font-size: 1.85vh;
    word-wrap: break-word;
    background: var(--primary);
    box-shadow: var(--shadow-button);
@@ -540,7 +546,11 @@
 .chat-sender {
    margin-bottom: 0.25vh;
    font-weight: var(--font-weight-bold);
-   font-size: 1.5vh;
+   font-size: 1.7vh;
+}
+
+.chat-text {
+   white-space: pre-line;
 }
 
 #chat-input-container {
@@ -555,5 +565,5 @@
    border-radius: var(--radius-md);
    background: var(--primary);
    padding: 1.25vh 1.5vh;
-   font-size: 1.625vh;
+   font-size: 1.85vh;
 }

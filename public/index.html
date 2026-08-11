@@ -221,7 +221,7 @@
 						<span>Time</span>
 						<input type="number" id="setting-time-base" min="30" max="3600" step="30" />
 					</label>
-					<label class="settings-toggle room-settings-toggle">
+					<label class="settings-toggle room-settings-toggle shared-team-clock-toggle">
 						<input type="checkbox" id="setting-time-shared" />
 						<span>Shared team clocks</span>
 					</label>
@@ -286,7 +286,8 @@
 			<div id="chat-section">
 				<div id="chat-messages"></div>
 				<div id="chat-input-container">
-					<input type="text" id="chat-input" placeholder="Type message..." maxlength="200" />
+					<input type="text" id="chat-input" placeholder="Type message..." maxlength="200" autocomplete="off"
+						autocapitalize="off" autocorrect="off" spellcheck="false" />
 				</div>
 			</div>
 		</div>
