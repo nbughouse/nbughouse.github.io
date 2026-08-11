@@ -9,6 +9,7 @@ import {
 } from "@shared/room";
 import {
     endGameUI,
+    rememberLatestWinners,
     rebuildRoomBoardElements,
     showRoomElements,
     startGameUI,
@@ -31,12 +32,6 @@ import { gs } from "./session";
 import { updateURL } from "./url";
 
 export function initGameSocket(): void {
-    gs.socket.on("sent-player", (name: string) => {
-        gs.player.name = name;
-        gs.name = name;
-        sessionStorage.setItem("name", name);
-    });
-
     gs.socket.on("joined-room", (raw: SerializedRoom) => {
         const room = Room.deserialize(raw);
 
@@ -170,6 +165,7 @@ export function initGameSocket(): void {
     gs.socket.on("ended-room", (team: Team, reason: string, time: number) => {
         for (const match of gs.room.game.matches) match.updateTime(time);
 
+        rememberLatestWinners(team);
         gs.room.endRoom(team);
         clearLastMoves();
         endGameUI();

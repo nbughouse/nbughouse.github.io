@@ -1,5 +1,6 @@
 export enum PlayerStatus {
     CONNECTED = "connected",
+    SPECTATING = "spectating",
     DISCONNECTED = "disconnected",
 }
 

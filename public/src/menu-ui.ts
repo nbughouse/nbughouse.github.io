@@ -1,7 +1,7 @@
 import { stopPingUpdates } from "./game-ui";
 import { stopTimeUpdates } from "./match-ui";
 import { roomExists } from "./room-api";
-import { sn } from "./session";
+import { setStoredProfileValue, sn } from "./session";
 import { getBasePath } from "./app-paths";
 import { applyAllChessSettings } from "./chess-ui";
 import { initMenuBackground } from "./menu-background";
@@ -79,10 +79,16 @@ export function initMenuControls(): void {
     });
 
     setupNameInput("player-name-input");
+    syncMenuNameInputs(sn.name);
 
     const readyButton = document.querySelector("#ready-btn");
     readyButton?.addEventListener("click", () => {
         sn.socket.emit("start-room");
+    });
+
+    const spectatorButton = document.querySelector("#spectator-btn");
+    spectatorButton?.addEventListener("click", () => {
+        sn.socket.emit("toggle-spectator");
     });
 
     const leaveRoomButton = document.querySelector("#leave-game-btn");
@@ -649,6 +655,13 @@ function syncMenuNameInputs(name: string): void {
     updateJoinPlayingAs();
 }
 
+export function applyAuthenticatedPlayerName(name: string): void {
+    sn.name = name;
+    if (sn.player) sn.player.name = name;
+    setStoredProfileValue("name", name);
+    syncMenuNameInputs(name);
+}
+
 function handleNameSubmit(event: Event): void {
     const target = event.target as HTMLInputElement;
     const name = target.value.trim();
@@ -661,7 +674,7 @@ function handleNameSubmit(event: Event): void {
 function setPlayerName(name: string): void {
     sn.name = name;
     if (sn.player) sn.player.name = name;
-    sessionStorage.setItem("name", name);
+    setStoredProfileValue("name", name);
     sn.socket.emit("set-name", name);
 }
 

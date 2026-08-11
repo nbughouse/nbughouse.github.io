@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="Play">
+  <g transform="translate(1.2 1.2) scale(.85)">
+    <path fill="#fff" d="M11 3c0 .7684-.2889 1.4692-.7639 2h1.2639v2h-1.1786L11.5 12l2.5 2v2H2v-2l2.5-2 1.1786-5H4.5V5h1.2639A2.9886 2.9886 0 0 1 5 3c0-1.6569 1.3431-3 3-3s3 1.3431 3 3Z"/>
+  </g>
+</svg>

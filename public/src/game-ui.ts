@@ -8,7 +8,7 @@ import type {
     TimeType,
 } from "@shared/config";
 import { getPlayerDisplayName, PlayerStatus } from "@shared/player";
-import { RoomStatus } from "@shared/room";
+import { RoomStatus, type Team } from "@shared/room";
 import {
     createMatchElements,
     setVisualFlipped,
@@ -27,6 +27,7 @@ let pingIntervalID: number;
 let pingStartTime: number = 0;
 let roomSettingsSaveTimeout: number | undefined;
 const roomSettingsSaveDelay = 300;
+let latestWinningPlayerIds = new Set<string>();
 
 export function initGameControls(): void {
     initSidebarTabs();
@@ -198,7 +199,7 @@ function initSidebarTabs(): void {
         [
             { value: "no-check", label: "No check" },
             { value: "no-mate", label: "No mate" },
-            { value: "mate", label: "Mate allowed" },
+            { value: "mate", label: "Allow Mate" },
         ],
     );
 
@@ -495,18 +496,10 @@ export function rebuildRoomBoardElements(): void {
     for (const container of boardsArea.querySelectorAll(".match-container"))
         container.remove();
 
-    // Reset grid mode when creating room elements
-    if (gridMode) {
-        gridMode = false;
-        const gameArea = document.querySelector("#game-area") as HTMLDivElement;
-        gameArea.classList.remove("grid-mode");
-        window.removeEventListener("resize", updateGridLayout);
-        resetToFlexLayout();
-    }
-
     for (let index = 0; index < gs.room.game.matches.length; index++)
         createMatchElements(index);
 
+    setGridMode(shouldForceGridMode(), true);
     updateBoardNavigationVisibility();
 
     const totalBoardsSpan = document.querySelector("#totalBoards");
@@ -514,18 +507,6 @@ export function rebuildRoomBoardElements(): void {
         totalBoardsSpan.textContent = gs.room.game.matches.length.toString();
 
     initScrollControls();
-
-    // Reset button icon to scroll view
-    const gridToggleButton = document.querySelector(
-        "#grid-toggle-btn",
-    ) as HTMLButtonElement;
-
-    gridToggleButton.innerHTML = `
-         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="18"></rect>
-            <rect x="14" y="3" width="7" height="18"></rect>
-         </svg>
-      `;
 }
 
 export function updateRoomSettingsUI(): void {
@@ -651,10 +632,22 @@ export function updateStartButton(): void {
     const readyButton = document.querySelector(
         "#ready-btn",
     ) as HTMLButtonElement;
+    const spectatorButton = document.querySelector(
+        "#spectator-btn",
+    ) as HTMLButtonElement;
+    const spectatorButtonIcon = document.querySelector(
+        "#spectator-btn-icon",
+    ) as HTMLImageElement;
 
     const isHost =
         gs.room?.status === RoomStatus.LOBBY && gs.room.hostID === gs.player.id;
-    const isWaitingForPlayers = (gs.room?.players.size ?? 0) <= 1;
+    const isLobby = gs.room?.status === RoomStatus.LOBBY;
+    const isSpectating =
+        gs.room?.getPlayer(gs.player.id)?.status === PlayerStatus.SPECTATING;
+    const playerCount = [...(gs.room?.players.values() ?? [])].filter(
+        (player) => player.status === PlayerStatus.CONNECTED,
+    ).length;
+    const isWaitingForPlayers = playerCount <= 1;
 
     if (isHost && isWaitingForPlayers) {
         readyButton.textContent = "Waiting for people...";
@@ -670,18 +663,29 @@ export function updateStartButton(): void {
         readyButton.classList.add("waiting");
     }
 
+    spectatorButton.hidden = !isLobby;
+    spectatorButton.setAttribute(
+        "aria-label",
+        isSpectating ? "Return to game" : "Spectate",
+    );
+    spectatorButton.title = isSpectating ? "Return to game" : "Spectate";
+    spectatorButton.classList.toggle("is-spectating", isSpectating);
+    spectatorButtonIcon.src = getAssetPath(
+        isSpectating ? "img/pawn.svg" : "img/eye.svg",
+    );
+
     updateRoomSettingsUI();
 }
 
 function resetGameButtons(): void {
-    const readyButton = document.querySelector(
-        "#ready-btn",
-    ) as HTMLButtonElement;
+    const lobbyActionRow = document.querySelector(
+        "#lobby-action-row",
+    ) as HTMLElement;
     const resignButton = document.querySelector(
         "#resign-btn",
     ) as HTMLButtonElement;
 
-    readyButton.style.display = "block";
+    lobbyActionRow.style.display = "flex";
     resignButton.style.display = "none";
     updateStartButton();
 }
@@ -694,9 +698,14 @@ export function updateUIPlayerList(): void {
             const playerDiv = document.createElement("div");
             const nameDiv = document.createElement("div");
             const statsDiv = document.createElement("div");
+            const scoreText = document.createElement("span");
+            const isSpectating =
+                player.status === PlayerStatus.SPECTATING;
             const statusClass =
                 player.status === PlayerStatus.DISCONNECTED
                     ? "status-disconnected"
+                    : isSpectating
+                      ? "status-spectating"
                     : "";
 
             const isCurrentPlayer = id === gs.player.id;
@@ -707,14 +716,43 @@ export function updateUIPlayerList(): void {
             if (isCurrentPlayer)
                 nameDiv.style.fontWeight = "var(--font-weight-bold)";
             statsDiv.className = "player-stats";
-            statsDiv.textContent = `${player.wins}/${player.total}`;
+            if (latestWinningPlayerIds.has(id)) {
+                const crown = document.createElement("img");
+                crown.className = "winner-crown";
+                crown.src = getAssetPath("img/crown.svg");
+                crown.alt = "Winner";
+                statsDiv.append(crown);
+            }
+            scoreText.textContent = `${player.wins}/${player.total}`;
+            statsDiv.append(scoreText);
 
+            if (isSpectating) {
+                const spectatingIcon = document.createElement("img");
+                spectatingIcon.className = "spectating-icon";
+                spectatingIcon.src = getAssetPath("img/eye.svg");
+                spectatingIcon.alt = "";
+                spectatingIcon.setAttribute("aria-hidden", "true");
+                playerDiv.append(spectatingIcon);
+            }
             playerDiv.append(nameDiv);
             playerDiv.append(statsDiv);
             playerList.append(playerDiv);
         }
     }
     updateStartButton();
+}
+
+export function rememberLatestWinners(team: Team): void {
+    latestWinningPlayerIds = new Set();
+
+    for (const match of gs.room.game.matches) {
+        const player = match.getPlayerTeam(team);
+        if (player) latestWinningPlayerIds.add(player.id);
+    }
+}
+
+function clearLatestWinners(): void {
+    latestWinningPlayerIds = new Set();
 }
 
 // MARK: Chat UI
@@ -903,7 +941,22 @@ export function initScrollControls(): void {
 // MARK: Grid Mode UI
 
 export function toggleGridMode(): void {
-    gridMode = !gridMode;
+    if (shouldForceGridMode()) {
+        setGridMode(true);
+        return;
+    }
+
+    setGridMode(!gridMode);
+}
+
+function shouldForceGridMode(): boolean {
+    return getTotalBoards() === 2;
+}
+
+function setGridMode(enabled: boolean, forceLayout = false): void {
+    if (gridMode === enabled && !forceLayout) return;
+
+    gridMode = enabled;
     const gameArea = document.querySelector("#game-area") as HTMLDivElement;
     const gridToggleButton = document.querySelector(
         "#grid-toggle-btn",
@@ -994,19 +1047,21 @@ function resetToFlexLayout(): void {
 // MARK: Start/End Game UI
 
 export function startGameUI(): void {
-    const readyButton = document.querySelector(
-        "#ready-btn",
-    ) as HTMLButtonElement;
+    const lobbyActionRow = document.querySelector(
+        "#lobby-action-row",
+    ) as HTMLElement;
     const resignButton = document.querySelector(
         "#resign-btn",
     ) as HTMLButtonElement;
 
+    clearLatestWinners();
+
     // Show resign button only if player is in the game
     if (isPlayerInGame()) {
-        readyButton.style.display = "none";
+        lobbyActionRow.style.display = "none";
         resignButton.style.display = "block";
     } else {
-        readyButton.style.display = "none";
+        lobbyActionRow.style.display = "none";
         resignButton.style.display = "none";
     }
 
@@ -1030,14 +1085,14 @@ export function startGameUI(): void {
 }
 
 export function endGameUI(): void {
-    const readyButton = document.querySelector(
-        "#ready-btn",
-    ) as HTMLButtonElement;
+    const lobbyActionRow = document.querySelector(
+        "#lobby-action-row",
+    ) as HTMLElement;
     const resignButton = document.querySelector(
         "#resign-btn",
     ) as HTMLButtonElement;
 
-    readyButton.style.display = "block";
+    lobbyActionRow.style.display = "flex";
     resignButton.style.display = "none";
     updateStartButton();
 

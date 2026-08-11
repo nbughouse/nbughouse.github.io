@@ -1,7 +1,7 @@
 import { Color } from "@shared/chess";
 import { getPlayerDisplayName, type Player } from "@shared/player";
 import type { Match } from "@shared/room";
-import { RoomStatus } from "@shared/room";
+import { RoomStatus, Team } from "@shared/room";
 import {
     createBoardElement,
     createPocketElement,
@@ -50,6 +50,15 @@ function formatTime(time: number): string {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function formatTimeDifference(time: number): string {
+    const sign = time >= 0 ? "+" : "-";
+    const milliseconds = Math.abs(time);
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${sign}${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 function createPocketRowElements(
     boardID: number,
     side: "top" | "bottom",
@@ -61,19 +70,27 @@ function createPocketRowElements(
     info.className = "player-info";
     info.id = `${side}-info-${boardID}`;
 
-    const name = document.createElement("div");
-    name.className = "player-name-display";
+    const timeDifference = document.createElement("div");
+    timeDifference.className = "player-time-difference";
 
     const time = document.createElement("div");
     time.className = "player-time-display";
     time.append(createClockValue());
 
-    info.append(name);
+    info.append(timeDifference);
     info.append(time);
 
     const pocket = createPocketElement(boardID, side);
+    const pocketArea = document.createElement("div");
+    pocketArea.className = "pocket-area";
 
-    row.append(pocket, info);
+    const name = document.createElement("div");
+    name.className = "player-name-plaque";
+    name.id = `${side}-name-${boardID}`;
+    name.hidden = true;
+
+    pocketArea.append(pocket);
+    row.append(pocketArea, info, name);
 
     return row;
 }
@@ -179,21 +196,22 @@ function updateUIPlayerSlot(
         playerInfo.setAttribute("tabindex", "0");
     }
 
-    updatePlayerName(playerInfo, player);
+    updatePlayerName(boardID, side, player);
 }
 
 function updatePlayerName(
-    playerInfo: HTMLElement,
+    boardID: number,
+    side: "top" | "bottom",
     player: Player | undefined,
 ): void {
-    const name = playerInfo.querySelector(
-        ".player-name-display",
-    ) as HTMLElement;
+    const name = document.querySelector(`#${side}-name-${boardID}`) as
+        | HTMLElement
+        | null;
+    if (!name) return;
+
+    name.hidden = !player;
     name.textContent = player ? getPlayerDisplayName(player) : "";
-    name.style.color =
-        player && player.id === gs.player.id
-            ? "var(--text)"
-            : "var(--hidden-text)";
+    name.style.color = "var(--text)";
 }
 
 // UI Update Functions - Time
@@ -203,22 +221,16 @@ export function updateUITime(): void {
 
         const isFlipped = getBoardFlipState(index);
 
-        const whiteTime = formatTime(matchInstance.whiteTime);
-        const blackTime = formatTime(matchInstance.blackTime);
-
-        const topTime = isFlipped ? whiteTime : blackTime;
-        const bottomTime = isFlipped ? blackTime : whiteTime;
-
         updateTimeDisplay(
             index,
             "top",
-            topTime,
+            isFlipped ? matchInstance.whiteTime : matchInstance.blackTime,
             isFlipped ? Color.WHITE : Color.BLACK,
         );
         updateTimeDisplay(
             index,
             "bottom",
-            bottomTime,
+            isFlipped ? matchInstance.blackTime : matchInstance.whiteTime,
             isFlipped ? Color.BLACK : Color.WHITE,
         );
     }
@@ -227,7 +239,7 @@ export function updateUITime(): void {
 function updateTimeDisplay(
     boardID: number,
     position: "top" | "bottom",
-    timeString: string,
+    time: number,
     color: Color,
 ): void {
     const playerInfo = document.querySelector(
@@ -238,8 +250,12 @@ function updateTimeDisplay(
         ".player-time-display",
     ) as HTMLElement;
     const timeValue = timeDisplay.querySelector(".clock-value") as HTMLElement;
+    const timeDifference = playerInfo.querySelector(
+        ".player-time-difference",
+    ) as HTMLElement;
 
-    timeValue.textContent = timeString;
+    timeValue.textContent = formatTime(time);
+    timeDifference.textContent = formatTeamTimeDifference(boardID, color, time);
     timeDisplay.classList.toggle("white-clock", color === Color.WHITE);
     timeDisplay.classList.toggle("black-clock", color === Color.BLACK);
 
@@ -248,6 +264,41 @@ function updateTimeDisplay(
         color === getMatchInstance(boardID).chess.turn;
     timeDisplay.classList.toggle("active-clock", playing);
     playerInfo.classList.toggle("active-player", playing);
+}
+
+function formatTeamTimeDifference(
+    boardID: number,
+    color: Color,
+    time: number,
+): string {
+    const otherTeamMinimum = getOtherTeamMinimumTime(boardID, color);
+    return otherTeamMinimum === undefined
+        ? ""
+        : formatTimeDifference(time - otherTeamMinimum);
+}
+
+function getOtherTeamMinimumTime(
+    boardID: number,
+    color: Color,
+): number | undefined {
+    const match = getMatchInstance(boardID);
+    const otherTeam = match.getTeam(color) === Team.RED ? Team.BLUE : Team.RED;
+    let minimum: number | undefined;
+
+    for (let index = 0; index < gs.room.game.matches.length; index++) {
+        if (index === boardID) continue;
+
+        const candidate = getTeamTime(gs.room.game.matches[index], otherTeam);
+        if (minimum === undefined || candidate < minimum) minimum = candidate;
+    }
+
+    return minimum;
+}
+
+function getTeamTime(match: Match, team: Team): number {
+    const color =
+        (team === Team.BLUE) === match.flipped ? Color.WHITE : Color.BLACK;
+    return color === Color.WHITE ? match.whiteTime : match.blackTime;
 }
 
 export function updateTimeLeft(currentTime: number = Date.now()): void {

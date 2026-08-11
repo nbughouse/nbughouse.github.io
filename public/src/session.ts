@@ -14,8 +14,7 @@ export class Session {
     settings: Settings;
 
     constructor(id?: string, auth?: string) {
-        const storedName =
-            globalThis.sessionStorage?.getItem("name") || undefined;
+        const storedName = getStoredProfileValue("name");
         this.socket = io(getBackendUrl(), getSocketOptions(id, auth));
 
         this.room = undefined;
@@ -61,9 +60,9 @@ export class Session {
         this.player = undefined;
         this.auth = "";
         this.name = "";
-        globalThis.sessionStorage?.removeItem("id");
-        globalThis.sessionStorage?.removeItem("auth");
-        globalThis.sessionStorage?.removeItem("name");
+        removeStoredProfileValue("id");
+        removeStoredProfileValue("auth");
+        removeStoredProfileValue("name");
     }
 }
 
@@ -83,6 +82,7 @@ function getSocketOptions(
     token: string | undefined,
 ): Partial<ManagerOptions & SocketOptions> {
     const options: Partial<ManagerOptions & SocketOptions> = {
+        autoConnect: false,
         transports: ["websocket", "polling"],
         tryAllTransports: true,
         upgrade: false,
@@ -96,8 +96,8 @@ function getSocketOptions(
 }
 
 export function initSession() {
-    const id = globalThis.sessionStorage?.getItem("id") || undefined;
-    const auth = globalThis.sessionStorage?.getItem("auth") || undefined;
+    const id = getStoredProfileValue("id");
+    const auth = getStoredProfileValue("auth");
 
     sn = new Session(id, auth);
     gs = sn as GameSession;
@@ -111,3 +111,67 @@ export type GameSession = Session & {
 
 export let sn: Session;
 export let gs: GameSession;
+
+type ProfileStorageKey = "id" | "auth" | "name";
+
+export function setStoredProfileValue(
+    key: ProfileStorageKey,
+    value: string,
+): void {
+    let persisted = false;
+    try {
+        const storage = globalThis.localStorage;
+        if (storage) {
+            storage.setItem(key, value);
+            persisted = true;
+        }
+    } catch {
+        // Fall back to session storage when persistent storage is unavailable.
+    }
+
+    if (persisted) {
+        try {
+            globalThis.sessionStorage?.removeItem(key);
+        } catch {
+            // The value is already persisted; stale session data is harmless.
+        }
+        return;
+    }
+
+    try {
+        globalThis.sessionStorage?.setItem(key, value);
+    } catch {
+        // The in-memory session still works when browser storage is unavailable.
+    }
+}
+
+function getStoredProfileValue(key: ProfileStorageKey): string | undefined {
+    try {
+        const storedValue = globalThis.localStorage?.getItem(key);
+        if (storedValue) return storedValue;
+    } catch {
+        // Fall back to session storage when persistent storage is unavailable.
+    }
+
+    try {
+        const legacyValue = globalThis.sessionStorage?.getItem(key) || undefined;
+        if (legacyValue) setStoredProfileValue(key, legacyValue);
+        return legacyValue;
+    } catch {
+        return undefined;
+    }
+}
+
+function removeStoredProfileValue(key: ProfileStorageKey): void {
+    try {
+        globalThis.localStorage?.removeItem(key);
+    } catch {
+        // Ignore unavailable browser storage.
+    }
+
+    try {
+        globalThis.sessionStorage?.removeItem(key);
+    } catch {
+        // Ignore unavailable browser storage.
+    }
+}

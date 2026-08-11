@@ -195,7 +195,7 @@ export class Room {
 
     private connectedPlayers(): Player[] {
         return [...this.players.values()].filter(
-            (player) => player.status !== PlayerStatus.DISCONNECTED,
+            (player) => player.status === PlayerStatus.CONNECTED,
         );
     }
 
@@ -521,12 +521,12 @@ export function randomizeMatchPlayers(
     for (const match of matches) {
         if (
             match.whitePlayer &&
-            match.whitePlayer.status !== PlayerStatus.DISCONNECTED
+            match.whitePlayer.status === PlayerStatus.CONNECTED
         )
             playersByID.set(match.whitePlayer.id, match.whitePlayer);
         if (
             match.blackPlayer &&
-            match.blackPlayer.status !== PlayerStatus.DISCONNECTED
+            match.blackPlayer.status === PlayerStatus.CONNECTED
         )
             playersByID.set(match.blackPlayer.id, match.blackPlayer);
     }

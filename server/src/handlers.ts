@@ -97,7 +97,15 @@ export function setupHandlers(socket: GameSocket): void {
         const player = socket.room.getPlayer(socket.player.id);
         if (!player) return;
 
+        const wasSpectating = player.status === PlayerStatus.SPECTATING;
+        player.status = PlayerStatus.CONNECTED;
         board.setPlayer(player, color);
+        if (wasSpectating)
+            io.to(socket.room.code).emit(
+                "p-set-status",
+                socket.player.id,
+                PlayerStatus.CONNECTED,
+            );
         io.to(socket.room.code).emit(
             "p-joined-board",
             socket.player.id,
@@ -146,8 +154,42 @@ export function setupHandlers(socket: GameSocket): void {
     socket.on("leave-board", (boardID: number, color: Color) => {
         if (!socket.room || socket.room.status !== RoomStatus.LOBBY) return;
 
-        socket.room.game.matches[boardID].removePlayer(color);
+        const board = socket.room.game.matches[boardID];
+        if (board.getPlayer(color)?.id !== socket.player.id) return;
+
+        board.removePlayer(color);
         io.to(socket.room.code).emit("p-left-board", boardID, color);
+    });
+
+    socket.on("toggle-spectator", () => {
+        if (!socket.room || socket.room.status !== RoomStatus.LOBBY) return;
+
+        const player = socket.room.getPlayer(socket.player.id);
+        if (!player) return;
+
+        if (player.status === PlayerStatus.SPECTATING) {
+            player.status = PlayerStatus.CONNECTED;
+            io.to(socket.room.code).emit(
+                "p-set-status",
+                socket.player.id,
+                PlayerStatus.CONNECTED,
+            );
+            return;
+        }
+
+        const vacatedSeats = getPlayerSeats(socket.room, socket.player.id);
+        player.status = PlayerStatus.SPECTATING;
+
+        socket.room.removePlayerFromBoards(socket.player.id);
+
+        for (const { boardID, color } of vacatedSeats)
+            io.to(socket.room.code).emit("p-left-board", boardID, color);
+
+        io.to(socket.room.code).emit(
+            "p-set-status",
+            socket.player.id,
+            PlayerStatus.SPECTATING,
+        );
     });
 
     socket.on("resign-room", () => {
@@ -197,6 +239,13 @@ function joinRoom(socket: GameSocket, code: string): void {
         return;
     }
 
+    if (socket.room?.code === code || hasAnotherRoomConnection(socket, code)) {
+        socket.emit("error", "You have already joined this room");
+        return;
+    }
+
+    if (socket.room) handlePlayerLeave(socket);
+
     socket.join(code);
     socket.room = room;
 
@@ -222,6 +271,20 @@ function joinRoom(socket: GameSocket, code: string): void {
         );
         socket.emit("joined-room", room.serialize());
     }
+}
+
+function hasAnotherRoomConnection(socket: GameSocket, code: string): boolean {
+    for (const connectedSocket of io.sockets.sockets.values()) {
+        const otherSocket = connectedSocket as GameSocket;
+        if (
+            otherSocket.id !== socket.id &&
+            otherSocket.player?.id === socket.player.id &&
+            otherSocket.room?.code === code
+        )
+            return true;
+    }
+
+    return false;
 }
 
 function handlePlayerLeave(socket: GameSocket): void {

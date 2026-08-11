@@ -60,23 +60,51 @@
    background: var(--primary);
    min-width: calc(var(--square-size) * 8);
    min-height: calc(var(--square-size) * 10);
-   overflow: hidden;
+   overflow: visible;
 }
 
 /* Pockets */
 .pocket-row {
    display: flex;
+   position: relative;
    align-items: stretch;
    background: var(--surface);
    width: 100%;
 }
 
+.pocket-area {
+   display: flex;
+   position: relative;
+   flex: 1;
+   min-width: 0;
+}
+
 .pocket-row:first-child {
+   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
    box-shadow: inset 0 -0.12vh 0 var(--border-soft);
 }
 
 .pocket-row:last-child {
+   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
    box-shadow: inset 0 0.12vh 0 var(--border-soft);
+}
+
+.pocket-row:first-child .pocket,
+.pocket-row:first-child .pocket-area {
+   border-radius: var(--radius-lg) 0 0 0;
+}
+
+.pocket-row:first-child .player-info {
+   border-radius: 0 var(--radius-lg) 0 0;
+}
+
+.pocket-row:last-child .pocket,
+.pocket-row:last-child .pocket-area {
+   border-radius: 0 0 0 var(--radius-lg);
+}
+
+.pocket-row:last-child .player-info {
+   border-radius: 0 0 var(--radius-lg) 0;
 }
 
 .pocket {
@@ -129,6 +157,41 @@
    font-weight: var(--font-weight-bold);
    font-size: calc(var(--square-size) * 0.147);
    box-shadow: var(--shadow-button);
+}
+
+.player-name-plaque {
+   position: absolute;
+   z-index: 2;
+   left: 50%;
+   border-radius: var(--radius-sm);
+   background: var(--primary);
+   padding: calc(var(--square-size) * 0.075) calc(var(--square-size) * 0.28);
+   min-width: calc(var(--square-size) * 2.65);
+   min-height: calc(var(--square-size) * 0.4);
+   max-width: calc(100% - (var(--square-size) * 0.32));
+   overflow: hidden;
+   box-shadow: var(--shadow-button);
+   font-weight: var(--font-weight-bold);
+   font-size: calc(var(--square-size) * 0.28);
+   line-height: 1;
+   text-align: center;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+   pointer-events: none;
+}
+
+.player-name-plaque[hidden] {
+   display: none;
+}
+
+.pocket-row-top .player-name-plaque {
+   top: 0;
+   transform: translate(-50%, -50%);
+}
+
+.pocket-row-bottom .player-name-plaque {
+   bottom: 0;
+   transform: translate(-50%, 50%);
 }
 
 /* Board */
@@ -327,7 +390,7 @@
    overflow: hidden;
 }
 
-.player-name-display {
+.player-time-difference {
    display: flex;
    justify-content: center;
    align-items: center;

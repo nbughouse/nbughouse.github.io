@@ -27,11 +27,11 @@
 				</header>
 				<div id="menu-container">
 					<!-- CONTROLS -->
-						<div id="section" class="menu-view">
-							<label id="player-panel" for="player-name-input">
-								<input type="text" id="player-name-input" placeholder="Guest" maxlength="20" autocomplete="off"
-									aria-label="Player name" required />
-							</label>
+					<div id="section" class="menu-view">
+						<label id="player-panel" for="player-name-input">
+							<input type="text" id="player-name-input" placeholder="Guest" maxlength="20"
+								autocomplete="off" aria-label="Player name" required />
+						</label>
 						<button id="create-game-btn" class="game-action-btn">
 							Create New Room
 						</button>
@@ -57,12 +57,13 @@
 						<div id="join-form">
 							<label class="join-field" for="join-room-code-input">
 								<span>Match ID</span>
-								<input type="text" id="join-room-code-input" maxlength="4" autocomplete="off" required />
-								</label>
-								<label class="join-field" for="join-player-name-input">
-									<input type="text" id="join-player-name-input" placeholder="Guest" maxlength="20"
-										autocomplete="off" aria-label="Player name" required />
-								</label>
+								<input type="text" id="join-room-code-input" maxlength="4" autocomplete="off"
+									required />
+							</label>
+							<label class="join-field" for="join-player-name-input">
+								<input type="text" id="join-player-name-input" placeholder="Guest" maxlength="20"
+									autocomplete="off" aria-label="Player name" required />
+							</label>
 							<button id="submit-join-btn" class="game-action-btn" type="button">
 								Join match!
 							</button>
@@ -70,13 +71,14 @@
 					</div>
 					<div id="name-section" class="menu-view hidden">
 						<div class="menu-view-topbar">
-							<button id="back-from-name-btn" class="open-arrow" type="button" aria-label="Back">←</button>
+							<button id="back-from-name-btn" class="open-arrow" type="button"
+								aria-label="Back">←</button>
 						</div>
-							<div id="name-form">
-								<label class="join-field" for="action-player-name-input">
-									<input type="text" id="action-player-name-input" placeholder="Guest" maxlength="20"
-										autocomplete="off" aria-label="Player name" required />
-								</label>
+						<div id="name-form">
+							<label class="join-field" for="action-player-name-input">
+								<input type="text" id="action-player-name-input" placeholder="Guest" maxlength="20"
+									autocomplete="off" aria-label="Player name" required />
+							</label>
 							<button id="submit-action-name-btn" class="game-action-btn" type="button">
 								Continue
 							</button>
@@ -84,7 +86,8 @@
 					</div>
 					<div id="help-section" class="menu-view hidden">
 						<div class="menu-view-topbar">
-							<button id="back-from-help-btn" class="open-arrow" type="button" aria-label="Back">←</button>
+							<button id="back-from-help-btn" class="open-arrow" type="button"
+								aria-label="Back">←</button>
 						</div>
 						<div id="help-content">
 							<section class="help-block">
@@ -195,7 +198,12 @@
 					</div>
 				</div>
 			</div>
-			<button id="ready-btn">Start</button>
+			<div id="lobby-action-row">
+				<button id="ready-btn">Start</button>
+				<button id="spectator-btn" type="button" aria-label="Spectate">
+					<img id="spectator-btn-icon" src="/assets/img/eye.svg" alt="" aria-hidden="true" />
+				</button>
+			</div>
 			<button id="resign-btn">Resign</button>
 			<div id="sidebar-tabs">
 				<button id="players-tab-btn" class="sidebar-tab active" type="button">Players</button>
@@ -225,7 +233,8 @@
 						<input type="checkbox" id="setting-time-shared" />
 						<span>Shared team clocks</span>
 					</label>
-					<button id="more-room-settings-btn" class="room-settings-more-btn" type="button" aria-expanded="false">
+					<button id="more-room-settings-btn" class="room-settings-more-btn" type="button"
+						aria-expanded="false">
 						More settings
 					</button>
 					<div id="more-room-settings" class="hidden">
@@ -248,16 +257,16 @@
 								<option value="custom">Custom FEN</option>
 							</select>
 						</label>
-						<label class="settings-field settings-field-wide">
+						<label class="settings-field">
 							<span>FEN</span>
-							<input type="text" id="setting-initial-board-fen" placeholder="Custom starting FEN" />
+							<input type="text" id="setting-initial-board-fen" />
 						</label>
 						<label class="settings-field">
 							<span>Drops</span>
 							<select id="setting-drop-aggression">
 								<option value="no-check">No check</option>
 								<option value="no-mate">No mate</option>
-								<option value="mate">Mate allowed</option>
+								<option value="mate">Allow Mate</option>
 							</select>
 						</label>
 						<label class="settings-field">

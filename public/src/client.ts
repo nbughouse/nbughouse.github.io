@@ -7,11 +7,22 @@ import { checkURLForRoom } from "./url";
 
 document.addEventListener("DOMContentLoaded", () => {
     (function () {
-        initSession();
+        const session = initSession();
         initMenuSocket();
         initMenuControls();
         initGameSocket();
         initGameControls();
-        checkURLForRoom();
+
+        const checkRoomURLAfterProfileLoads = () => {
+            session.socket.off(
+                "created-player",
+                checkRoomURLAfterProfileLoads,
+            );
+            session.socket.off("sent-player", checkRoomURLAfterProfileLoads);
+            void checkURLForRoom();
+        };
+        session.socket.once("created-player", checkRoomURLAfterProfileLoads);
+        session.socket.once("sent-player", checkRoomURLAfterProfileLoads);
+        session.socket.connect();
     })();
 });

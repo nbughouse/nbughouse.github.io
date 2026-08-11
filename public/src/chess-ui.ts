@@ -442,8 +442,8 @@ function executeMove(id: number, move: Move, premove: boolean): void {
     deselectPiece();
 }
 
-function attemptMove(id: number, to: Position): void {
-    if (!selected || selected.boardID !== id) return;
+function attemptMove(id: number, to: Position): boolean {
+    if (!selected || selected.boardID !== id) return false;
 
     const move: Move = {
         from: selected.pos,
@@ -453,8 +453,8 @@ function attemptMove(id: number, to: Position): void {
     const board = getVisualChess(id).chess;
     const premove = board.turn !== board.getPiece(move.from)?.color;
 
-    if (premove && !gs.settings.premoves) return;
-    if (!board.isLegal(move, premove)) return;
+    if (premove && !gs.settings.premoves) return false;
+    if (!board.isLegal(move, premove)) return false;
 
     // Check if this is a promotion move
     if (
@@ -471,10 +471,11 @@ function attemptMove(id: number, to: Position): void {
                 executeMove(id, move, premove);
             });
         }
-        return;
+        return true;
     }
 
     executeMove(id, move, premove);
+    return true;
 }
 
 // MARK: UI Update Funcs
@@ -885,16 +886,26 @@ function handleSquareMouseDown(event: MouseEvent): void {
 
     event.preventDefault();
 
+    const canSelectTarget =
+        targetPiece &&
+        isMyPiece(id, targetPiece) &&
+        (gs.settings.premoves || board.turn === targetPiece.color);
+
     if (selected?.boardID === id) {
-        if (gs.settings.movementMode !== "drag") attemptMove(id, pos);
+        const moved =
+            gs.settings.movementMode !== "drag" && attemptMove(id, pos);
+        if (moved) return;
+
+        if (canSelectTarget) {
+            selectPiece(id, pos);
+            if (gs.settings.movementMode !== "click") holdPiece(event);
+        } else {
+            deselectPiece();
+        }
         return;
     }
 
-    if (
-        targetPiece &&
-        isMyPiece(id, targetPiece) &&
-        (gs.settings.premoves || board.turn === targetPiece.color)
-    ) {
+    if (canSelectTarget) {
         selectPiece(id, pos);
         if (gs.settings.movementMode !== "click") holdPiece(event);
     } else {
