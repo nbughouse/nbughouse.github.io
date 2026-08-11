@@ -1,18 +1,45 @@
-:root {
-   --font-family: "Segoe UI", Tahoma, sans-serif;
+@import url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700;800&display=swap");
 
-   --background: #000000;
-   --primary: #1c1c20;
-   --secondary: #17171a;
-   --accent: #242429;
-   --text: rgba(255, 255, 255, 0.9);
-   --hidden-text: rgba(255, 255, 255, 0.5);
+@font-face {
+   font-family: "open-arrow";
+   src: url("/assets/fonts/OpenArrow-Regular.woff2") format("woff2");
+   font-weight: normal;
+   font-style: normal;
+   font-display: swap;
+   unicode-range: U+2190-21FF;
+}
+
+:root {
+   --font-family: "League Spartan", sans-serif;
+   --font-weight-bold: 600;
+
+   --background: #302e2b;
+   --primary: #262522;
+   --secondary: #211f1d;
+   --accent: #3d3935;
+   --surface: #383531;
+   --surface-muted: #373531;
+   --surface-raised: #45413c;
+   --text: rgba(255, 255, 255, 0.92);
+   --hidden-text: rgba(255, 255, 255, 0.58);
+   --text-secondary: var(--hidden-text);
+   --border-soft: rgba(255, 255, 255, 0.08);
+   --shadow-soft: 0 1.2vh 3vh rgba(0, 0, 0, 0.32);
+   --shadow-bottom: inset 0 -0.28vh 0 rgba(0, 0, 0, 0.18);
+   --shadow-bottom-active: inset 0 -0.12vh 0 rgba(0, 0, 0, 0.18);
+   --shadow-button: var(--shadow-bottom);
+
+   --radius-sm: 0.65vh;
+   --radius-md: 1vh;
+   --radius-lg: 1.45vh;
 
    --blue: #3a7cd5;
 
-   --green: #5da061;
-   --yellow: #c2985e;
-   --red: #c13d3f;
+   --green: #81b64c;
+   --green-dark: #6a9941;
+   --yellow: #f0b65a;
+   --red: #c94f4f;
+   --red-dark: #a94141;
 
    --green-yellow: color-mix(in lch, var(--green), var(--yellow));
    --yellow-red: color-mix(in lch, var(--yellow), var(--red));
@@ -34,6 +61,7 @@
 body {
    min-height: 100vh;
    font-family: var(--font-family);
+   background: var(--background);
 }
 
 .screen {
@@ -50,9 +78,24 @@ body {
 }
 
 input,
-button {
+button,
+select,
+textarea {
    display: block;
    width: 100%;
+   font: inherit;
+}
+
+.bottom-shadow,
+.control-surface {
+   border: none;
+   outline: none;
+   box-shadow: var(--shadow-bottom);
+}
+
+.open-arrow {
+   font-family: "open-arrow", var(--font-family);
+   font-weight: normal;
 }
 
 /* Error messages */
@@ -61,7 +104,7 @@ button {
    margin-top: 15px;
    border-radius: 6px;
    padding: 10px;
-   font-weight: bold;
+   font-weight: var(--font-weight-bold);
    text-align: center;
 }
 
@@ -80,21 +123,51 @@ button {
    scrollbar-width: none;
 }
 
-input {
+input:not([type="checkbox"]),
+textarea {
    display: flex;
+   outline: none;
    border: none;
-   background: var(--accent);
-   border-radius: 8px;
-   background: var(--accent);
+   border-radius: var(--radius-md);
+   background: var(--surface);
    padding: 12px 15px;
-   font-size: 15px;
+   box-shadow: var(--shadow-bottom);
+   transition:
+      background 120ms ease,
+      box-shadow 120ms ease;
+}
+
+input:not([type="checkbox"]):focus,
+textarea:focus {
+   outline: none;
+   background: var(--surface);
+   box-shadow: var(--shadow-bottom);
 }
 
 button {
    cursor: pointer;
    border: none;
-   border-radius: 8px;
+   border-radius: var(--radius-md);
    padding: 12px 20px;
-   font-weight: 600;
+   box-shadow: var(--shadow-button);
+   font-weight: var(--font-weight-bold);
    font-size: 15px;
+   transition:
+      filter 120ms ease,
+      transform 120ms ease,
+      background 120ms ease;
+}
+
+strong,
+b {
+   font-weight: var(--font-weight-bold);
+}
+
+button:hover:not(:disabled) {
+   filter: brightness(1.06);
+}
+
+button:active:not(:disabled) {
+   transform: translateY(0.12vh);
+   box-shadow: var(--shadow-bottom-active);
 }

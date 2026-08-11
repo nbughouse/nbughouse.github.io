@@ -1,0 +1,105 @@
+#menu {
+   background: var(--background);
+}
+
+#menu::before {
+   content: "";
+   position: absolute;
+   inset: 0;
+   z-index: 0;
+   background-image:
+      linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+   background-size: 48px 48px;
+   pointer-events: none;
+}
+
+#menu::after {
+   content: "";
+   position: absolute;
+   inset: 0;
+   z-index: 5;
+   background: rgba(0, 0, 0, 0.3);
+   pointer-events: none;
+}
+
+#menu-boardscape {
+   --gallery-lanes: 3;
+   --gallery-column-gap: 2vw;
+   --gallery-gap: 4vh;
+   --square-size: calc(
+      (100vw - 2vw - (var(--gallery-column-gap) * 2)) / 24
+   );
+   display: grid;
+   position: absolute;
+   inset: 0;
+   z-index: 1;
+   grid-template-columns: repeat(var(--gallery-lanes), minmax(0, 1fr));
+   gap: var(--gallery-column-gap);
+   padding: 0 1vw;
+   overflow: hidden;
+   pointer-events: none;
+}
+
+.menu-gallery-definitions,
+.menu-piece-probe {
+   position: absolute;
+   width: 0;
+   height: 0;
+   overflow: hidden;
+}
+
+.menu-gallery-lane {
+   min-width: 0;
+   height: 100%;
+   overflow: hidden;
+}
+
+.menu-gallery-strip {
+   display: flex;
+   flex-direction: column;
+   width: 100%;
+   will-change: transform;
+}
+
+.menu-gallery-lane.moves-up .menu-gallery-strip {
+   animation: menu-gallery-up 60s linear infinite;
+}
+
+.menu-gallery-lane.moves-down .menu-gallery-strip {
+   animation: menu-gallery-down 60s linear infinite;
+}
+
+.menu-gallery-sequence {
+   display: flex;
+   flex: none;
+   flex-direction: column;
+   align-items: center;
+   gap: var(--gallery-gap);
+   padding: calc(var(--gallery-gap) / 2) 0;
+}
+
+.menu-gallery-board {
+   display: block;
+   flex: none;
+   width: calc(var(--square-size) * 8);
+   height: calc(var(--square-size) * 8);
+}
+
+@keyframes menu-gallery-up {
+   from {
+      transform: translateY(0);
+   }
+   to {
+      transform: translateY(-50%);
+   }
+}
+
+@keyframes menu-gallery-down {
+   from {
+      transform: translateY(-50%);
+   }
+   to {
+      transform: translateY(0);
+   }
+}

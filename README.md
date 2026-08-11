@@ -62,7 +62,7 @@ Build the GitHub Pages frontend:
 pnpm run build:pages
 ```
 
-This writes `dist/public`, copies static `audio`, `img`, and `pieces` assets,
+This writes `dist/public`, copies static `sound`, `img`, and `pieces` assets,
 creates `404.html` for direct room links, and adds `.nojekyll`.
 
 Build only the VM backend:
@@ -166,7 +166,7 @@ https://nbughouse.duckdns.org/socket.io -> bughouse-n-player:8000/socket.io
 ## Project Layout
 
 ```text
-public/       Vite frontend app, styles, images, pieces, and audio
+public/       Vite frontend app, styles, images, pieces, and sound
 server/       Express server, Socket.IO setup, room events, and timers
 shared/       Shared chess rules, room state, player state, chat, and config
 scripts/      Build helper scripts
@@ -178,14 +178,14 @@ dist/         Generated build output
 1. Enter a player name.
 2. Create a room or join a room by code.
 3. Pick open board seats with the `[+]` buttons.
-4. Ready up once all seats are assigned.
-5. The room starts automatically when every seated player is ready.
-6. Captures are added to teammate pockets.
-7. Pocket pieces can be dropped on eligible boards.
-8. A room ends on checkmate, resignation, or timeout.
+4. The host starts the room once players are set.
+5. Captures are added to teammate pockets.
+6. Pocket pieces can be dropped on eligible boards.
+7. A room ends on checkmate, resignation, or timeout.
 
-The current room model creates three boards by default. Every seat on every
-board must be occupied and ready before the room starts.
+The current room model creates two boards by default. Every seat on every
+board must be occupied before the room starts when manual assignment is used.
+With random assignment, connected room players are assigned automatically.
 
 ## Notes
 

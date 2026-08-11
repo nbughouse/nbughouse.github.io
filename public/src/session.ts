@@ -16,10 +16,10 @@ export class Session {
     constructor(id?: string, auth?: string) {
         const storedName =
             globalThis.sessionStorage?.getItem("name") || undefined;
-        this.socket = io(getSocketUrl(), getSocketOptions(id, auth));
+        this.socket = io(getBackendUrl(), getSocketOptions(id, auth));
 
         this.room = undefined;
-        this.player = id ? new Player(id, storedName) : undefined;
+        this.player = id ? new Player(id, storedName || "") : undefined;
         this.auth = auth || "";
         this.name = storedName || "";
         this.settings = new Settings();
@@ -32,7 +32,7 @@ export class Session {
                 if (!ignoredEvents.has(event)) {
                     console.log(
                         `%c⬇ [RECEIVE] ${event}`,
-                        "color: #2196F3; font-weight: bold",
+                        "color: #2196F3; font-weight: 600",
                         arguments_,
                     );
                 }
@@ -47,7 +47,7 @@ export class Session {
                 if (!ignoredEvents.has(event)) {
                     console.log(
                         `%c⬆ [EMIT] ${event}`,
-                        "color: #4CAF50; font-weight: bold",
+                        "color: #4CAF50; font-weight: 600",
                         arguments_,
                     );
                 }
@@ -67,7 +67,7 @@ export class Session {
     }
 }
 
-function getSocketUrl(): string {
+export function getBackendUrl(): string {
     const configuredBackendUrl = import.meta.env.VITE_BACKEND_URL?.trim();
     if (configuredBackendUrl) return configuredBackendUrl.replace(/\/+$/, "");
 

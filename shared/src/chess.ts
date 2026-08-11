@@ -79,7 +79,7 @@ export class Chess {
         return chess;
     }
 
-    reset(): void {
+    reset(backRank: PieceType[] = defaultBackRank()): void {
         this.whitePocket = new Map();
         this.blackPocket = new Map();
         this.turn = Color.WHITE;
@@ -89,17 +89,6 @@ export class Chess {
         this.blackCastleLong = true;
         this.enPassantTarget = undefined;
         this.board = createEmptyBoard();
-
-        const backRank: PieceType[] = [
-            PieceType.ROOK,
-            PieceType.KNIGHT,
-            PieceType.BISHOP,
-            PieceType.QUEEN,
-            PieceType.KING,
-            PieceType.BISHOP,
-            PieceType.KNIGHT,
-            PieceType.ROOK,
-        ];
 
         for (let index = 0; index < 8; index++) {
             this.board[0][index] = {
@@ -116,6 +105,14 @@ export class Chess {
 
         this.whitePocket = new Map();
         this.blackPocket = new Map();
+    }
+
+    resetRandom(): void {
+        this.reset(randomBackRank());
+        this.whiteCastleShort = false;
+        this.whiteCastleLong = false;
+        this.blackCastleShort = false;
+        this.blackCastleLong = false;
     }
 
     getPocket(color: Color): Map<PieceType, number> {
@@ -826,6 +823,50 @@ function createEmptyBoard(): Board {
     return board;
 }
 
+function defaultBackRank(): PieceType[] {
+    return [
+        PieceType.ROOK,
+        PieceType.KNIGHT,
+        PieceType.BISHOP,
+        PieceType.QUEEN,
+        PieceType.KING,
+        PieceType.BISHOP,
+        PieceType.KNIGHT,
+        PieceType.ROOK,
+    ];
+}
+
+function randomBackRank(): PieceType[] {
+    const rank = Array<PieceType | undefined>(8);
+    const darkBishopCol = randomItem([0, 2, 4, 6]);
+    const lightBishopCol = randomItem([1, 3, 5, 7]);
+    rank[darkBishopCol] = PieceType.BISHOP;
+    rank[lightBishopCol] = PieceType.BISHOP;
+
+    const queenCol = randomItem(emptyCols(rank));
+    rank[queenCol] = PieceType.QUEEN;
+
+    for (let index = 0; index < 2; index++) {
+        const knightCol = randomItem(emptyCols(rank));
+        rank[knightCol] = PieceType.KNIGHT;
+    }
+
+    const [leftRookCol, kingCol, rightRookCol] = emptyCols(rank);
+    rank[leftRookCol] = PieceType.ROOK;
+    rank[kingCol] = PieceType.KING;
+    rank[rightRookCol] = PieceType.ROOK;
+
+    return rank as PieceType[];
+}
+
+function emptyCols(rank: Array<PieceType | undefined>): number[] {
+    return rank.flatMap((piece, col) => (piece ? [] : [col]));
+}
+
+function randomItem<T>(items: T[]): T {
+    return items[Math.floor(Math.random() * items.length)];
+}
+
 export interface Move {
     from: Position;
     to: Position;
@@ -837,7 +878,7 @@ export interface MoveResult {
     promoted?: PieceType;
 }
 
-// Move Types: Aligns with audio
+// Move Types: Aligns with sound
 export enum MoveType {
     ILLEGAL = "illegal",
     NORMAL = "normal",

@@ -27,7 +27,7 @@ export function getRoomPath(roomCode: string): string {
 
 export function getAssetPath(assetPath: string): string {
 	const cleanAssetPath = assetPath.replace(/^\/+/, "");
-	return `${getBasePath()}${cleanAssetPath}`;
+	return `${getBasePath()}assets/${cleanAssetPath}`;
 }
 
 function getPathnameFromBaseUrl(baseUrl: string): string {

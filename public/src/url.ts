@@ -1,13 +1,32 @@
-import { checkAndPromptForName } from "./menu-ui";
+import { checkAndPromptForName, showError } from "./menu-ui";
+import { roomExists } from "./room-api";
 import { sn } from "./session";
 import { getAppPathname, getBasePath, getRoomPath } from "./app-paths";
 
-export function checkURLForRoom(): void {
-    const roomCode = getRoomCodeFromPath();
+export async function checkURLForRoom(): Promise<void> {
+    const roomCode = getRoomCodeFromPath()?.toUpperCase();
+
+    if (!roomCode) return;
+
+    if (!/^[A-Z0-9]{4}$/.test(roomCode)) {
+        clearRoomURL();
+        showError("menu-error", "Invalid room code");
+        return;
+    }
+
+    const exists = await roomExists(roomCode);
+    if (exists === undefined) {
+        showError("menu-error", "Cannot reach game server. Try again in a moment.");
+        return;
+    }
+
+    if (!exists) {
+        clearRoomURL();
+        showError("menu-error", `Room ${roomCode} does not exist`);
+        return;
+    }
 
     if (
-        roomCode &&
-        roomCode.length === 4 &&
         checkAndPromptForName(() => {
             clearRoomURL();
             sn.socket.emit("join-room", roomCode);
@@ -19,11 +38,26 @@ export function checkURLForRoom(): void {
 }
 
 export function updateURL(roomCode: string): void {
-    globalThis.history.replaceState({}, "", getRoomPath(roomCode));
+    const roomPath = getRoomPath(roomCode);
+    const roomState = { bughouseView: "game", roomCode };
+
+    if (
+        globalThis.location.pathname ===
+        new URL(roomPath, globalThis.location.origin).pathname
+    ) {
+        globalThis.history.replaceState(roomState, "", roomPath);
+        return;
+    }
+
+    globalThis.history.pushState(roomState, "", roomPath);
 }
 
 export function clearRoomURL(): void {
-    globalThis.history.replaceState({}, "", getBasePath());
+    globalThis.history.replaceState(
+        { bughouseView: "menu", menuView: "main" },
+        "",
+        getBasePath(),
+    );
 }
 
 function getRoomCodeFromPath(): string | undefined {

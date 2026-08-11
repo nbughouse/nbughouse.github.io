@@ -5,7 +5,7 @@ import fs from "node:fs";
 import http from "node:http";
 import { Server, Socket } from "socket.io";
 import { config } from "@shared/config";
-import { Player } from "@shared/player";
+import { getPlayerDisplayName, Player } from "@shared/player";
 import type { Room } from "@shared/room";
 import { RoomStatus, Team } from "@shared/room";
 import path from "node:path";
@@ -21,7 +21,6 @@ export const io = new Server(httpServer, {
 });
 export const rooms = new Map<string, Room>();
 export const profiles = new Map<string, Profile>();
-export const MENU_ROOM = "*";
 
 export class GameSocket extends Socket {
     room: Room | undefined;
@@ -45,6 +44,27 @@ const shouldUseDevClient =
 const publicPath = hasBuiltClient ? prodPublicPath : devPublicPath;
 const sharedSrcPath = path.resolve(repoRoot, "shared/src");
 
+app.use("/api", (request, response, next) => {
+    const origin = request.headers.origin;
+    if (isHttpOriginAllowed(origin)) {
+        if (origin) response.setHeader("Access-Control-Allow-Origin", origin);
+        response.setHeader("Vary", "Origin");
+    }
+    next();
+});
+
+app.get("/api/rooms/:roomCode", (request, response) => {
+    const roomCode = String(request.params.roomCode || "").toUpperCase();
+    if (!/^[A-Z0-9]{4}$/.test(roomCode)) {
+        return response.status(400).json({
+            exists: false,
+            error: "Invalid room code format",
+        });
+    }
+
+    response.json({ exists: rooms.has(roomCode) });
+});
+
 if (shouldUseDevClient && !hasBuiltClient) {
     const { createServer } = await import("vite");
     const vite = await createServer({
@@ -64,9 +84,7 @@ if (shouldUseDevClient && !hasBuiltClient) {
     });
     app.use(vite.middlewares);
 } else if (hasBuiltClient) {
-    app.use("/audio", express.static(path.join(publicPath, "audio")));
-    app.use("/img", express.static(path.join(publicPath, "img")));
-    app.use("/pieces", express.static(path.join(publicPath, "pieces")));
+    app.use("/assets", express.static(path.join(publicPath, "assets")));
     app.use(express.static(publicPath));
 } else {
     app.get("/", (_request, response) => {
@@ -99,16 +117,15 @@ io.on("connection", (socket: Socket) => {
         const profile = profiles.get(handshakePlayerID);
         if (profile && profile.auth === handshakeToken) {
             gameSocket.player = new Player(handshakePlayerID, profile.name);
-            gameSocket.emit("sent-player", profile.name);
+            profile.name = gameSocket.player.name;
+            gameSocket.emit("sent-player", gameSocket.player.name);
         } else {
             issueFreshProfile(gameSocket);
         }
     } else {
         issueFreshProfile(gameSocket);
     }
-    gameSocket.join(MENU_ROOM);
     setupHandlers(gameSocket);
-    emitRoomList();
 });
 
 const PORT = Number(process.env.PORT) || config.serverPort;
@@ -135,11 +152,13 @@ setInterval(() => {
             room.game.updateTime(currentTime);
             const timeout = room.game.checkTimeout();
             if (timeout) {
-                room.endRoom(timeout.team === Team.BLUE ? Team.RED : Team.BLUE);
+                const winningTeam =
+                    timeout.team === Team.BLUE ? Team.RED : Team.BLUE;
+                room.endRoom(winningTeam);
                 io.to(code).emit(
                     "ended-room",
-                    timeout.team,
-                    timeout.player.name + " timed out.",
+                    winningTeam,
+                    getPlayerDisplayName(timeout.player) + " timed out.",
                     currentTime,
                 );
             }
@@ -168,28 +187,20 @@ function issueFreshProfile(socket: GameSocket): void {
     socket.emit("created-player", id, auth);
 }
 
-export function emitRoomList(): void {
-    io.to(MENU_ROOM).emit(
-        "listed-rooms",
-        [...rooms.values()].map((room) => room.getRoomListing()),
-    );
-}
-
 function isAllowedOrigin(
     origin: string | undefined,
     callback: (error: Error | null, allow?: boolean) => void,
 ): void {
-    if (!origin) {
-        callback(null, true);
-        return;
-    }
-
-    if (getAllowedOrigins().has(origin)) {
+    if (isHttpOriginAllowed(origin)) {
         callback(null, true);
         return;
     }
 
     callback(new Error("Origin not allowed"));
+}
+
+function isHttpOriginAllowed(origin: string | undefined): boolean {
+    return !origin || getAllowedOrigins().has(origin);
 }
 
 function getAllowedOrigins(): Set<string> {

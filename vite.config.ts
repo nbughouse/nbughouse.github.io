@@ -21,23 +21,17 @@ function getBasePath(): string {
 function copyStaticAssetDirs() {
 	return {
 		name: "copy-static-asset-dirs",
-		async closeBundle() {
-			const distPublicDir = path.resolve(rootDir, "dist/public");
-			const assetDirs = ["audio", "img", "pieces"];
-
-			await Promise.all(
-				assetDirs.map((dir) =>
-					cp(
-						path.resolve(rootDir, "public", dir),
-						path.join(distPublicDir, dir),
-						{
-							recursive: true,
-						},
-					),
-				),
-			);
-		},
-	};
+	async closeBundle() {
+		const distPublicDir = path.resolve(rootDir, "dist/public");
+		await cp(
+			path.resolve(rootDir, "public/assets"),
+			path.join(distPublicDir, "assets"),
+			{
+				recursive: true,
+			},
+		);
+	},
+};
 }
 
 export default defineConfig({
@@ -66,6 +60,10 @@ export default defineConfig({
 			allow: [rootDir],
 		},
 		proxy: {
+			"/api": {
+				target: `http://localhost:${config.serverPort}`,
+				changeOrigin: true,
+			},
 			"/socket.io": {
 				target: `http://localhost:${config.serverPort}`,
 				ws: true,

@@ -4,10 +4,10 @@
    justify-content: center;
    align-items: center;
    gap: 2vh;
-   border-bottom: 0.2vh solid var(--accent);
+   box-shadow: 0 0.45vh 1.4vh rgba(0, 0, 0, 0.18);
    background: var(--primary);
    padding: 1.5vh;
-   font-weight: bold;
+   font-weight: var(--font-weight-bold);
 }
 
 .scroll-btn {
@@ -16,20 +16,28 @@
    align-items: center;
    cursor: pointer;
    border: none;
-   background: var(--accent);
+   outline: none;
+   border-radius: var(--radius-md);
+   background: var(--surface-raised);
    padding: 0;
    width: 6vh;
    height: 4vh;
    font-size: 2vh;
+   box-shadow: var(--shadow-button);
 }
 
 .scroll-btn:disabled {
    opacity: 0.3;
-   cursor: not-needed;
+   cursor: not-allowed;
 }
 
 .scroll-indicator {
+   border: none;
+   border-radius: 999px;
+   background: var(--secondary);
+   padding: 0.75vh 1.5vh;
    font-size: 2.5vh;
+   box-shadow: var(--shadow-button);
 }
 
 #grid-toggle-btn {
@@ -39,9 +47,20 @@
    cursor: pointer;
    margin: 0;
    border: none;
-   background: none;
+   outline: none;
+   border-radius: var(--radius-md);
+   background: var(--surface-raised);
    padding: 0;
    width: 4vh;
+   height: 4vh;
+   overflow: hidden;
+   font-size: 0;
+   box-shadow: var(--shadow-button);
+}
+
+#grid-toggle-btn svg {
+   width: 2.5vh;
+   height: 2.5vh;
 }
 
 /* Promotion Dialog */
@@ -50,20 +69,30 @@
    top: 50%;
    left: 50%;
    transform: translate(-50%, -50%);
-   background: white;
-   border: 2px solid #333;
-   border-radius: 8px;
+   border: 0.2vh solid var(--border-soft);
+   border-radius: var(--radius-lg);
+   background: var(--primary);
    padding: 20px;
    display: flex;
    gap: 15px;
    z-index: 1000;
+   box-shadow: var(--shadow-soft);
 }
 
 .promotion-option {
+   display: block;
    width: 80px;
    height: 80px;
    cursor: pointer;
-   border-radius: 4px;
+   border: none;
+   outline: none;
+   border-radius: var(--radius-md);
+   background: var(--surface);
+   background-repeat: no-repeat;
+   background-position: center;
+   background-size: contain;
+   padding: 6px;
+   box-shadow: var(--shadow-button);
 }
 
 .promotion-option:hover {

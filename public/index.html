@@ -6,59 +6,173 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<title>Bughouse</title>
 	<link rel="stylesheet" href="/styles/base.css" />
+	<link rel="stylesheet" href="/styles/menu-background.css" />
 	<link rel="stylesheet" href="/styles/menu.css" />
 	<link rel="stylesheet" href="/styles/chess.css" />
 	<link rel="stylesheet" href="/styles/sidebar.css" />
 	<link rel="stylesheet" href="/styles/controls.css" />
-	<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+	<link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
 </head>
 
 <body>
 	<!-- MENU SCREEN -->
 	<div id="menu" class="screen">
-		<h1 id="menu-header">
-			<img src="/favicon.ico" alt="Bughouse" id="logo" />
-		</h1>
-		<div id="menu-container">
-			<!-- LEFT SIDE: CONTROLS -->
-			<div id="section">
-				<input type="text" id="player-name-input" placeholder="Enter your name" maxlength="20"
-					autocomplete="off" required />
-				<button id="create-game-btn" class="game-action-btn">
-					Create Game
-				</button>
-				<button id="join-game-btn" class="game-action-btn">
-					Join from ID
-				</button>
-				<div class="form-group">
-					<button id="setting-btn" class="util-btns">
-						<p>⚙</p>
-					</button>
-					<button id="info-btn" class="util-btns">
-						<p>?</p>
-					</button>
+		<div id="menu-boardscape" aria-hidden="true"></div>
+		<div id="menu-stack">
+			<div id="menu-error"></div>
+			<div id="menu-shell">
+				<header id="menu-header">
+					<img src="/assets/favicon.ico" alt="" id="logo" />
+					<strong>bughouse.club</strong>
+				</header>
+				<div id="menu-container">
+					<!-- CONTROLS -->
+						<div id="section" class="menu-view">
+							<label id="player-panel" for="player-name-input">
+								<input type="text" id="player-name-input" placeholder="Guest" maxlength="20" autocomplete="off"
+									aria-label="Player name" required />
+							</label>
+						<button id="create-game-btn" class="game-action-btn">
+							Create New Room
+						</button>
+						<button id="join-game-btn" class="game-action-btn secondary-action">
+							Join Room by ID
+						</button>
+						<div class="form-group">
+							<button id="setting-btn" class="util-btns" aria-label="Settings"></button>
+							<button id="info-btn" class="util-btns" aria-label="Info"></button>
+							<a id="github-btn" class="util-btns" href="https://github.com/nbughouse/nbughouse"
+								target="_blank" rel="noopener noreferrer" aria-label="GitHub repository">
+								<svg viewBox="0 0 98 96" aria-hidden="true" focusable="false">
+									<path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"
+										d="M48.9 0C21.9 0 0 22 0 49.1c0 21.7 14 40.1 33.5 46.6 2.4.4 3.3-1.1 3.3-2.4 0-1.2 0-5.2-.1-9.4-13.6 3-16.5-5.8-16.5-5.8-2.2-5.7-5.4-7.2-5.4-7.2-4.5-3.1.3-3 .3-3 4.9.3 7.5 5.1 7.5 5.1 4.4 7.5 11.5 5.3 14.3 4.1.4-3.2 1.7-5.3 3.1-6.6-10.9-1.2-22.3-5.5-22.3-24.4 0-5.4 1.9-9.8 5.1-13.2-.5-1.2-2.2-6.3.5-13 0 0 4.1-1.3 13.5 5 3.9-1.1 8.1-1.6 12.2-1.6 4.1 0 8.3.5 12.2 1.6 9.4-6.4 13.5-5 13.5-5 2.7 6.7 1 11.8.5 13 3.2 3.4 5.1 7.8 5.1 13.2 0 19-11.4 23.1-22.3 24.4 1.8 1.5 3.3 4.5 3.3 9.1 0 6.6-.1 11.9-.1 13.5 0 1.3.9 2.8 3.4 2.4C84 89.2 98 70.8 98 49.1 98 22 76.1 0 48.9 0Z" />
+								</svg>
+							</a>
+						</div>
+					</div>
+					<div id="join-section" class="menu-view hidden">
+						<div id="join-view-topbar">
+							<button id="back-to-menu-btn" class="open-arrow" type="button" aria-label="Back">←</button>
+						</div>
+						<div id="join-form">
+							<label class="join-field" for="join-room-code-input">
+								<span>Match ID</span>
+								<input type="text" id="join-room-code-input" maxlength="4" autocomplete="off" required />
+								</label>
+								<label class="join-field" for="join-player-name-input">
+									<input type="text" id="join-player-name-input" placeholder="Guest" maxlength="20"
+										autocomplete="off" aria-label="Player name" required />
+								</label>
+							<button id="submit-join-btn" class="game-action-btn" type="button">
+								Join match!
+							</button>
+						</div>
+					</div>
+					<div id="name-section" class="menu-view hidden">
+						<div class="menu-view-topbar">
+							<button id="back-from-name-btn" class="open-arrow" type="button" aria-label="Back">←</button>
+						</div>
+							<div id="name-form">
+								<label class="join-field" for="action-player-name-input">
+									<input type="text" id="action-player-name-input" placeholder="Guest" maxlength="20"
+										autocomplete="off" aria-label="Player name" required />
+								</label>
+							<button id="submit-action-name-btn" class="game-action-btn" type="button">
+								Continue
+							</button>
+						</div>
+					</div>
+					<div id="help-section" class="menu-view hidden">
+						<div class="menu-view-topbar">
+							<button id="back-from-help-btn" class="open-arrow" type="button" aria-label="Back">←</button>
+						</div>
+						<div id="help-content">
+							<section class="help-block">
+								<h2>Bughouse N Player</h2>
+								<p>
+									Multiplayer bughouse chess with multiple simultaneous boards.
+									Coordinate with teammates, pass captured pieces, and keep every
+									board moving.
+								</p>
+							</section>
+							<section class="help-block">
+								<h3>Start a match</h3>
+								<ol>
+									<li>Enter a name.</li>
+									<li>Create a new match or join with a 4-character match ID.</li>
+									<li>Pick open board seats from the player plaques.</li>
+									<li>The host starts the room once players are set.</li>
+								</ol>
+							</section>
+							<section class="help-block">
+								<h3>During play</h3>
+								<ul>
+									<li>Captured pieces go to your teammate's pocket.</li>
+									<li>Drop pocket pieces onto eligible boards.</li>
+									<li>Matches end by checkmate, resignation, or timeout.</li>
+								</ul>
+							</section>
+							<a id="github-link" href="https://github.com/nbughouse/nbughouse" target="_blank"
+								rel="noopener noreferrer">
+								View GitHub repository
+							</a>
+						</div>
+					</div>
+					<div id="menu-settings-section" class="menu-view hidden">
+						<div class="menu-view-topbar">
+							<button id="back-from-settings-btn" class="open-arrow" type="button"
+								aria-label="Back">←</button>
+						</div>
+						<div class="menu-settings-form">
+							<label class="settings-field">
+								<span>Pieces</span>
+								<select id="menu-setting-piece-theme"></select>
+							</label>
+							<label class="settings-field">
+								<span>Board</span>
+								<select id="menu-setting-board-theme"></select>
+							</label>
+							<label class="settings-field">
+								<span>Move</span>
+								<select id="menu-setting-movement-mode">
+									<option value="both">Drag + click</option>
+									<option value="drag">Drag only</option>
+									<option value="click">Click only</option>
+								</select>
+							</label>
+							<label class="settings-field">
+								<span>Sound</span>
+								<select id="menu-setting-sound-theme"></select>
+							</label>
+							<div class="settings-toggle-grid">
+								<label class="settings-toggle">
+									<input type="checkbox" id="menu-setting-auto-queen" />
+									<span>Auto queen</span>
+								</label>
+								<label class="settings-toggle">
+									<input type="checkbox" id="menu-setting-premoves" />
+									<span>Premoves</span>
+								</label>
+								<label class="settings-toggle">
+									<input type="checkbox" id="menu-setting-board-coords" />
+									<span>Show board coords</span>
+								</label>
+								<label class="settings-toggle">
+									<input type="checkbox" id="menu-setting-highlight-last-move" />
+									<span>Highlight last move</span>
+								</label>
+								<label class="settings-toggle">
+									<input type="checkbox" id="menu-setting-sounds" />
+									<span>Sounds</span>
+								</label>
+								<label class="settings-toggle">
+									<input type="checkbox" id="menu-setting-legal-moves" />
+									<span>Show legal moves</span>
+								</label>
+							</div>
+						</div>
+					</div>
 				</div>
-			</div>
-			<!-- RIGHT SIDE: ROOM LISTING -->
-			<div id="lobbies-list"></div>
-		</div>
-		<div id="menu-error"></div>
-	</div>
-
-	<!-- JOIN MODAL -->
-	<div id="join-modal" class="modal hidden">
-		<div class="modal-content">
-			<h2>Join Game</h2>
-			<p>Enter the 4-character room code</p>
-			<div class="form-group">
-				<input type="text" id="join-room-code-input" placeholder="Room code" maxlength="4" autocomplete="off"
-					required />
-			</div>
-			<div class="modal-buttons">
-				<button id="submit-join-btn" class="primary-btn">Join</button>
-				<button id="close-join-modal" class="secondary-btn">
-					Cancel
-				</button>
 			</div>
 		</div>
 	</div>
@@ -67,9 +181,9 @@
 	<div id="game" class="screen hidden">
 		<div id="game-sidebar">
 			<div id="sidebar-header">
-				<button id="leave-game-btn">⎋</button>
+				<button id="leave-game-btn" type="button" aria-label="Leave room"></button>
 				<div id="game-title">
-					Room: <span id="game-room-code"></span>
+					<button id="game-room-code" type="button" aria-label="Copy room link"></button>
 				</div>
 				<div class="ping-indicator" id="ping-indicator">
 					<div class="ping-bars">
@@ -81,9 +195,94 @@
 					</div>
 				</div>
 			</div>
-			<button id="ready-btn">Ready</button>
+			<button id="ready-btn">Start</button>
 			<button id="resign-btn">Resign</button>
-			<div id="player-list"></div>
+			<div id="sidebar-tabs">
+				<button id="players-tab-btn" class="sidebar-tab active" type="button">Players</button>
+				<button id="settings-tab-btn" class="sidebar-tab" type="button">Settings</button>
+			</div>
+			<div id="players-tab-panel" class="sidebar-tab-panel">
+				<div id="player-list"></div>
+			</div>
+			<div id="settings-tab-panel" class="sidebar-tab-panel hidden">
+				<div id="room-settings">
+					<label class="settings-field">
+						<span>Boards</span>
+						<input type="number" id="setting-match-num" min="1" max="8" step="1" />
+					</label>
+					<label class="settings-field">
+						<span>Player positions</span>
+						<select id="setting-player-assignment">
+							<option value="random">Random</option>
+							<option value="manual">Manual</option>
+						</select>
+					</label>
+					<label class="settings-field">
+						<span>Time</span>
+						<input type="number" id="setting-time-base" min="30" max="3600" step="30" />
+					</label>
+					<label class="settings-toggle room-settings-toggle">
+						<input type="checkbox" id="setting-time-shared" />
+						<span>Shared team clocks</span>
+					</label>
+					<button id="more-room-settings-btn" class="room-settings-more-btn" type="button" aria-expanded="false">
+						More settings
+					</button>
+					<div id="more-room-settings" class="hidden">
+						<label class="settings-field">
+							<span>Bonus</span>
+							<input type="number" id="setting-time-bonus" min="0" max="3600" step="1" />
+						</label>
+						<label class="settings-field">
+							<span>Clock</span>
+							<select id="setting-time-type">
+								<option value="increment">Increment</option>
+								<option value="delay">Delay</option>
+							</select>
+						</label>
+						<label class="settings-field">
+							<span>Start</span>
+							<select id="setting-initial-board-mode">
+								<option value="default">Default</option>
+								<option value="960">Chess960</option>
+								<option value="custom">Custom FEN</option>
+							</select>
+						</label>
+						<label class="settings-field settings-field-wide">
+							<span>FEN</span>
+							<input type="text" id="setting-initial-board-fen" placeholder="Custom starting FEN" />
+						</label>
+						<label class="settings-field">
+							<span>Drops</span>
+							<select id="setting-drop-aggression">
+								<option value="no-check">No check</option>
+								<option value="no-mate">No mate</option>
+								<option value="mate">Mate allowed</option>
+							</select>
+						</label>
+						<label class="settings-field">
+							<span>Promotion</span>
+							<select id="setting-promotion-type">
+								<option value="upgrade">Upgrade</option>
+								<option value="steal">Steal</option>
+							</select>
+						</label>
+						<label class="settings-field">
+							<span>Pawn drops</span>
+							<input type="text" id="setting-pawn-drop-ranks" inputmode="numeric" pattern="[1-7]-[1-7]" />
+						</label>
+						<label class="settings-field">
+							<span>Pockets</span>
+							<select id="setting-pocket-share">
+								<option value="color">Team colors</option>
+								<option value="shared">Everyone</option>
+								<option value="none">Independent</option>
+							</select>
+						</label>
+					</div>
+					<div id="room-settings-note"></div>
+				</div>
+			</div>
 			<div id="chat-section">
 				<div id="chat-messages"></div>
 				<div id="chat-input-container">
@@ -93,30 +292,15 @@
 		</div>
 		<div id="game-area-wrapper">
 			<div class="scroll-controls">
-				<button class="scroll-btn" id="scrollLeft">←</button>
+				<button class="scroll-btn open-arrow" id="scrollLeft">←</button>
 				<span class="scroll-indicator">Board <span id="boardRange">1</span> of
 					<span id="totalBoards">1</span></span>
 				<button id="grid-toggle-btn" class="control-btn">
 					Grid View
 				</button>
-				<button class="scroll-btn" id="scrollRight">→</button>
+				<button class="scroll-btn open-arrow" id="scrollRight">→</button>
 			</div>
 			<div id="game-area" class="hide-scrollbar"></div>
-		</div>
-	</div>
-	<!-- NAME MODAL -->
-	<div id="name-modal" class="modal hidden">
-		<div class="modal-content">
-			<h2>Please Enter Your Name</h2>
-			<p>You need to set a name before joining a room</p>
-			<div class="form-group">
-				<input type="text" id="modal-name-input" placeholder="Enter your name" maxlength="20" required />
-			</div>
-			<div id="modal-error" class="error"></div>
-			<div class="modal-buttons">
-				<button id="submit-name-btn" class="primary-btn">Confirm</button>
-				<button id="close-modal" class="secondary-btn">Cancel</button>
-			</div>
 		</div>
 	</div>
 	<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>

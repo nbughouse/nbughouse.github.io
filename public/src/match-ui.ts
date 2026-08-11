@@ -1,14 +1,13 @@
 import { Color } from "@shared/chess";
-import type { Player } from "@shared/player";
+import { getPlayerDisplayName, type Player } from "@shared/player";
 import type { Match } from "@shared/room";
-import { RoomStatus, Team } from "@shared/room";
+import { RoomStatus } from "@shared/room";
 import {
     createBoardElement,
     createPocketElement,
     updateUIChess,
 } from "./chess-ui";
 import { gs } from "./session";
-import { getAssetPath } from "./app-paths";
 
 export let visualFlipped: boolean = false;
 let intervalID: number;
@@ -56,7 +55,7 @@ function createPocketRowElements(
     side: "top" | "bottom",
 ): HTMLDivElement {
     const row = document.createElement("div");
-    row.className = "pocket-row";
+    row.className = `pocket-row pocket-row-${side}`;
 
     const info = document.createElement("div");
     info.className = "player-info";
@@ -67,21 +66,22 @@ function createPocketRowElements(
 
     const time = document.createElement("div");
     time.className = "player-time-display";
+    time.append(createClockValue());
 
     info.append(name);
     info.append(time);
 
-    const playerSlot = document.createElement("div");
-    playerSlot.className = "player-slot";
-    playerSlot.id = `${side}-player-slot-${boardID}`;
-
     const pocket = createPocketElement(boardID, side);
 
-    row.append(playerSlot);
-    row.append(info);
-    row.append(pocket);
+    row.append(pocket, info);
 
     return row;
+}
+
+function createClockValue(): HTMLSpanElement {
+    const value = document.createElement("span");
+    value.className = "clock-value";
+    return value;
 }
 
 // Match Element Creation
@@ -140,79 +140,46 @@ function updateUIPlayerSlot(
     player: Player | undefined,
     color: Color,
 ): void {
-    const playerSlot = document.querySelector(
-        `#${side}-player-slot-${boardID}`,
-    ) as HTMLElement;
     const playerInfo = document.querySelector(
         `#${side}-info-${boardID}`,
     ) as HTMLElement;
 
-    playerSlot.innerHTML = "";
-    const slotContent = player
-        ? createPlayerIcon(boardID, player, color)
-        : createEmptySlot(boardID, color);
-    playerSlot.append(slotContent);
+    playerInfo.classList.toggle(
+        "open-player-seat",
+        !player && gs.room.status === RoomStatus.LOBBY,
+    );
+    playerInfo.classList.toggle(
+        "own-player-seat",
+        Boolean(
+            player &&
+                player.id === gs.player.id &&
+                gs.room.status === RoomStatus.LOBBY,
+        ),
+    );
+
+    playerInfo.onclick = null;
+    playerInfo.onkeydown = null;
+    playerInfo.removeAttribute("role");
+    playerInfo.removeAttribute("tabindex");
+
+    if (
+        player?.id === gs.player.id &&
+        gs.room.status === RoomStatus.LOBBY
+    ) {
+        playerInfo.onclick = () => {
+            gs.socket.emit("leave-board", boardID, color);
+        };
+        playerInfo.onkeydown = (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                gs.socket.emit("leave-board", boardID, color);
+            }
+        };
+        playerInfo.setAttribute("role", "button");
+        playerInfo.setAttribute("tabindex", "0");
+    }
 
     updatePlayerName(playerInfo, player);
-}
-
-function createEmptySlot(boardID: number, color: Color): HTMLElement {
-    if (gs.room.status === RoomStatus.LOBBY) {
-        const slot = document.createElement("button");
-        slot.className = "join-board-btn";
-        slot.textContent = "[+]";
-        slot.addEventListener("click", () => {
-            const oppTeam =
-                getMatchInstance(boardID).getTeam(color) === Team.RED
-                    ? Team.BLUE
-                    : Team.RED;
-            for (const match of gs.room.game.matches)
-                if (match.getPlayerTeam(oppTeam)?.id === gs.player.id) return;
-
-            gs.socket.emit("join-board", boardID, color);
-        });
-        return slot;
-    } else {
-        const slot = document.createElement("img");
-        slot.className = "player-icon";
-        slot.src = getAssetPath("img/default-icon.png");
-        return slot;
-    }
-}
-
-function createPlayerIcon(
-    boardID: number,
-    player: Player,
-    color: Color,
-): HTMLElement {
-    const iconContainer = document.createElement("div");
-    iconContainer.style.position = "relative";
-    iconContainer.style.display = "inline-block";
-
-    const slot = document.createElement("img");
-    slot.className = "player-icon";
-    slot.src = getAssetPath("img/default-icon.png");
-    iconContainer.append(slot);
-
-    const shouldShowLeaveButton =
-        gs.room.status === RoomStatus.LOBBY && player.id === gs.player.id;
-
-    if (shouldShowLeaveButton) {
-        const leaveButton = createLeaveButton(boardID, color);
-        iconContainer.append(leaveButton);
-    }
-
-    return iconContainer;
-}
-
-function createLeaveButton(boardID: number, color: Color): HTMLButtonElement {
-    const leaveButton = document.createElement("button");
-    leaveButton.className = "leave-board-btn";
-    leaveButton.textContent = "×";
-    leaveButton.addEventListener("click", () => {
-        gs.socket.emit("leave-board", boardID, color);
-    });
-    return leaveButton;
 }
 
 function updatePlayerName(
@@ -222,7 +189,7 @@ function updatePlayerName(
     const name = playerInfo.querySelector(
         ".player-name-display",
     ) as HTMLElement;
-    name.textContent = player ? player.name : "";
+    name.textContent = player ? getPlayerDisplayName(player) : "";
     name.style.color =
         player && player.id === gs.player.id
             ? "var(--text)"
@@ -242,8 +209,18 @@ export function updateUITime(): void {
         const topTime = isFlipped ? whiteTime : blackTime;
         const bottomTime = isFlipped ? blackTime : whiteTime;
 
-        updateTimeDisplay(index, "top", topTime);
-        updateTimeDisplay(index, "bottom", bottomTime);
+        updateTimeDisplay(
+            index,
+            "top",
+            topTime,
+            isFlipped ? Color.WHITE : Color.BLACK,
+        );
+        updateTimeDisplay(
+            index,
+            "bottom",
+            bottomTime,
+            isFlipped ? Color.BLACK : Color.WHITE,
+        );
     }
 }
 
@@ -251,6 +228,7 @@ function updateTimeDisplay(
     boardID: number,
     position: "top" | "bottom",
     timeString: string,
+    color: Color,
 ): void {
     const playerInfo = document.querySelector(
         `#${position}-info-${boardID}`,
@@ -259,21 +237,20 @@ function updateTimeDisplay(
     const timeDisplay = playerInfo.querySelector(
         ".player-time-display",
     ) as HTMLElement;
+    const timeValue = timeDisplay.querySelector(".clock-value") as HTMLElement;
 
-    timeDisplay.textContent = timeString;
+    timeValue.textContent = timeString;
+    timeDisplay.classList.toggle("white-clock", color === Color.WHITE);
+    timeDisplay.classList.toggle("black-clock", color === Color.BLACK);
 
-    const color =
-        (position === "top") === getBoardFlipState(boardID)
-            ? Color.BLACK
-            : Color.WHITE;
     const playing =
         gs.room.status === RoomStatus.PLAYING &&
         color !== getMatchInstance(boardID).chess.turn;
-    timeDisplay.style.color =
-        playing || gs.room.status === RoomStatus.LOBBY
-            ? "var(--text)"
-            : "var(--hidden-text)";
-    playerInfo.style.border = playing ? "3px solid var(--green)" : "none";
+    timeDisplay.classList.toggle(
+        "active-clock",
+        playing || gs.room.status === RoomStatus.LOBBY,
+    );
+    playerInfo.classList.toggle("active-player", playing);
 }
 
 export function updateTimeLeft(currentTime: number = Date.now()): void {

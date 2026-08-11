@@ -5,6 +5,7 @@
         "outDir": "../dist/public",
         "rootDir": "./src",
         "tsBuildInfoFile": "../dist/public/.tsbuildinfo",
+        "types": ["vite/client"],
         "paths": {
             "@shared/*": ["../shared/src/*"]
         }

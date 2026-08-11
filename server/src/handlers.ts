@@ -1,9 +1,9 @@
-import type { Server } from "socket.io";
-import type { Color, Move } from "@shared/chess";
-import { PlayerStatus } from "@shared/player";
+import { Color, type Move } from "@shared/chess";
+import type { GameConfig } from "@shared/config";
+import { getPlayerDisplayName, PlayerStatus } from "@shared/player";
 import { Room, RoomStatus, Team } from "@shared/room";
 import type { GameSocket } from "./index";
-import { emitRoomList, io, MENU_ROOM, profiles, rooms } from "./index";
+import { io, profiles, rooms } from "./index";
 
 export function setupHandlers(socket: GameSocket): void {
     socket.on("ping", () => {
@@ -24,52 +24,52 @@ export function setupHandlers(socket: GameSocket): void {
     });
 
     socket.on("create-room", () => {
-        const code = createRoom();
+        const code = createRoom(undefined, socket.player.id);
         if (!code) {
             socket.emit("error", "Room limit reached");
             return;
         }
 
-        joinRoom(socket, io, code);
-        emitRoomList();
+        joinRoom(socket, code);
     });
 
     socket.on("join-room", (code: string) => {
-        joinRoom(socket, io, code.toUpperCase());
-        emitRoomList();
+        joinRoom(socket, code.toUpperCase());
     });
 
     socket.on("leave-room", () => {
         handlePlayerLeave(socket);
-        socket.join(MENU_ROOM);
     });
 
     socket.on("disconnect", () => {
         handlePlayerLeave(socket);
     });
 
-    socket.on("toggle-ready", () => {
-        if (!socket.room || socket.room.status === RoomStatus.PLAYING) return;
-
-        socket.player.status =
-            socket.player.status === PlayerStatus.READY
-                ? PlayerStatus.NOT_READY
-                : PlayerStatus.READY;
-
-        io.to(socket.room.code).emit(
-            "p-set-status",
-            socket.player.id,
-            socket.player.status,
-        );
+    socket.on("start-room", () => {
+        if (!socket.room || socket.room.status !== RoomStatus.LOBBY) return;
+        if (socket.room.hostID !== socket.player.id) return;
 
         const currentTime = Date.now();
-        if (socket.room.tryStartRoom()) {
+        if (socket.room.tryStartRoom(currentTime)) {
             io.to(socket.room.code).emit(
                 "started-room",
                 socket.room.game.serialize(),
                 currentTime,
             );
         }
+    });
+
+    socket.on("update-room-settings", (settings: Partial<GameConfig>) => {
+        if (!socket.room || socket.room.status !== RoomStatus.LOBBY) return;
+        if (socket.room.hostID !== socket.player.id) return;
+
+        if (!socket.room.updateConfig(settings)) return;
+
+        io.to(socket.room.code).emit(
+            "room-settings-updated",
+            socket.room.game.serialize(),
+        );
+        io.to(socket.room.code).emit("room-host-updated", socket.room.hostID);
     });
 
     socket.on("send-chat", (message: string) => {
@@ -94,7 +94,10 @@ export function setupHandlers(socket: GameSocket): void {
         for (const match of socket.room.game.matches)
             if (match.getPlayerTeam(oppTeam)?.id === socket.player.id) return;
 
-        board.setPlayer(socket.player, color);
+        const player = socket.room.getPlayer(socket.player.id);
+        if (!player) return;
+
+        board.setPlayer(player, color);
         io.to(socket.room.code).emit(
             "p-joined-board",
             socket.player.id,
@@ -127,13 +130,14 @@ export function setupHandlers(socket: GameSocket): void {
 
         if (board.chess.isCheckmate()) {
             const winningTeam = board.getTeam(color);
-            const winnerName = board.getPlayer(color)?.name;
+            const winner = board.getPlayer(color);
+            if (!winner) return;
 
             socket.room.endRoom(winningTeam);
             io.to(socket.room.code).emit(
                 "ended-room",
                 winningTeam,
-                winnerName + " won!",
+                getPlayerDisplayName(winner) + " won!",
                 currentTime,
             );
         }
@@ -152,11 +156,13 @@ export function setupHandlers(socket: GameSocket): void {
         const playerTeam = getPlayerTeam(socket);
         if (!playerTeam) return;
 
-        socket.room.endRoom(playerTeam === Team.BLUE ? Team.RED : Team.BLUE);
+        const winningTeam = playerTeam === Team.BLUE ? Team.RED : Team.BLUE;
+
+        socket.room.endRoom(winningTeam);
         io.to(socket.room.code).emit(
             "ended-room",
-            playerTeam,
-            "Resigned by " + socket.player.name,
+            winningTeam,
+            "Resigned by " + getPlayerDisplayName(socket.player),
             Date.now(),
         );
     });
@@ -174,16 +180,16 @@ function getPlayerTeam(socket: GameSocket): Team | undefined {
     }
 }
 
-function createRoom(roomCode?: string): string | undefined {
+function createRoom(roomCode?: string, hostID?: string): string | undefined {
     if (rooms.size >= 10_000) return;
 
     const code = roomCode || randomCode();
-    const room = new Room(code);
+    const room = new Room(code, hostID);
     rooms.set(code, room);
     return code;
 }
 
-function joinRoom(socket: GameSocket, io: Server, code: string): void {
+function joinRoom(socket: GameSocket, code: string): void {
     const room = rooms.get(code);
 
     if (!room) {
@@ -191,7 +197,6 @@ function joinRoom(socket: GameSocket, io: Server, code: string): void {
         return;
     }
 
-    socket.leave(MENU_ROOM);
     socket.join(code);
     socket.room = room;
 
@@ -200,14 +205,16 @@ function joinRoom(socket: GameSocket, io: Server, code: string): void {
 
     const playerInRoom = room.players.get(socket.player.id);
     if (playerInRoom) {
-        playerInRoom.status = PlayerStatus.NOT_READY;
+        playerInRoom.name = socket.player.name;
+        playerInRoom.status = PlayerStatus.CONNECTED;
         socket.emit("joined-room", room.serialize());
         socket
             .to(room.code)
-            .emit("p-set-status", socket.player.id, PlayerStatus.NOT_READY);
+            .emit("p-set-status", socket.player.id, PlayerStatus.CONNECTED);
     } else {
-        socket.player.status = PlayerStatus.NOT_READY;
-        room.addPlayer(socket.player);
+        const roomPlayer = socket.player.clone();
+        roomPlayer.status = PlayerStatus.CONNECTED;
+        room.addPlayer(roomPlayer);
         io.to(room.code).emit(
             "p-joined-room",
             socket.player.id,
@@ -226,13 +233,23 @@ function handlePlayerLeave(socket: GameSocket): void {
     if (room.status === RoomStatus.LOBBY) handleLobbyPlayerLeave(socket, room);
     else handleGamePlayerDisconnect(socket, room);
 
+    socket.room = undefined;
+
     if (shouldDeleteRoom(room)) deleteRoom(room.code);
 }
 
 function handleLobbyPlayerLeave(socket: GameSocket, room: Room): void {
-    room.removePlayer(socket.player.id);
-    socket.to(room.code).emit("p-left-room", socket.player.id);
-    emitRoomList();
+    const vacatedSeats = getPlayerSeats(room, socket.player.id);
+
+    room.disconnectPlayer(socket.player.id);
+    socket
+        .to(room.code)
+        .emit("p-set-status", socket.player.id, PlayerStatus.DISCONNECTED);
+
+    for (const { boardID, color } of vacatedSeats)
+        socket.to(room.code).emit("p-left-board", boardID, color);
+
+    socket.to(room.code).emit("room-host-updated", room.hostID);
 }
 
 function handleGamePlayerDisconnect(socket: GameSocket, room: Room): void {
@@ -251,7 +268,23 @@ function shouldDeleteRoom(room: Room): boolean {
 
 function deleteRoom(roomCode: string): void {
     rooms.delete(roomCode);
-    emitRoomList();
+}
+
+function getPlayerSeats(
+    room: Room,
+    playerID: string,
+): { boardID: number; color: Color }[] {
+    const seats = [];
+
+    for (let boardID = 0; boardID < room.game.matches.length; boardID++) {
+        const match = room.game.matches[boardID];
+        if (match.whitePlayer?.id === playerID)
+            seats.push({ boardID, color: Color.WHITE });
+        if (match.blackPlayer?.id === playerID)
+            seats.push({ boardID, color: Color.BLACK });
+    }
+
+    return seats;
 }
 
 function randomCode(): string {
