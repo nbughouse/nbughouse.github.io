@@ -47,12 +47,14 @@ export interface SerializedRoom {
     game: SerializedGame;
     chat: string;
     players: Record<string, Player>;
+    bannedPlayerIDs?: string[];
 }
 
 export class Room {
     code: string;
     hostID: string | undefined;
     players: Map<string, Player>;
+    bannedPlayerIDs: Set<string>;
     status: RoomStatus;
     game: Game;
     chat: Chat;
@@ -61,6 +63,7 @@ export class Room {
         this.code = code;
         this.hostID = hostID;
         this.players = new Map();
+        this.bannedPlayerIDs = new Set();
         this.status = RoomStatus.LOBBY;
         this.game = new Game();
         this.chat = new Chat();
@@ -79,6 +82,7 @@ export class Room {
             game: this.game.serialize(),
             chat: this.chat.serialize(),
             players: serializedPlayers,
+            bannedPlayerIDs: [...this.bannedPlayerIDs],
         };
     }
 
@@ -87,6 +91,7 @@ export class Room {
         room.hostID = data.hostID;
         room.status = data.status;
         room.chat = Chat.deserialize(data.chat);
+        room.bannedPlayerIDs = new Set(data.bannedPlayerIDs ?? []);
 
         for (const [id, playerData] of Object.entries(data.players)) {
             const player = new Player(

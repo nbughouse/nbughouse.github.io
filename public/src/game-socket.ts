@@ -20,6 +20,7 @@ import {
     updateUIPushChat,
     getPlayerPlaqueAppearance,
 } from "./game-ui";
+import { showError, showMenuScreen } from "./menu-ui";
 import { clearLastMoves, rememberLastMove } from "./chess-ui";
 import {
     startTimeUpdates,
@@ -59,8 +60,14 @@ export function initGameSocket(): void {
 
     gs.socket.on("room-host-updated", (hostID: string | undefined) => {
         gs.room.hostID = hostID;
+        updateUIPlayerList();
         updateRoomSettingsUI();
         updateStartButton();
+    });
+
+    gs.socket.on("banned-from-room", (roomCode: string) => {
+        showMenuScreen();
+        showError("menu-error", `You were banned from room ${roomCode}`);
     });
 
     gs.socket.on("p-joined-room", (id: string, name: string) => {

@@ -2,7 +2,6 @@ import type { ChatBadge, ChatMessage } from "@shared/chat";
 import { Color } from "@shared/chess";
 import type {
     DropAggression,
-    PlayerAssignment,
     PocketShare,
     PromotionType,
     TimeType,
@@ -179,7 +178,6 @@ function initSidebarTabs(): void {
         "#setting-time-bonus",
         "#setting-time-type",
         "#setting-time-shared",
-        "#setting-player-assignment",
         "#setting-initial-board-mode",
         "#setting-initial-board-fen",
         "#setting-drop-aggression",
@@ -226,14 +224,6 @@ function initSidebarTabs(): void {
             flushRoomSettingsSave();
         });
     }
-
-    createSettingsSelect(
-        document.querySelector("#setting-player-assignment") as HTMLSelectElement,
-        [
-            { value: "random", label: "Random" },
-            { value: "manual", label: "Manual" },
-        ],
-    );
 
     createSettingsSelect(
         document.querySelector("#setting-time-type") as HTMLSelectElement,
@@ -345,9 +335,6 @@ function saveRoomSettings(): void {
     const timeSharedInput = document.querySelector(
         "#setting-time-shared",
     ) as HTMLInputElement;
-    const playerAssignmentSelect = document.querySelector(
-        "#setting-player-assignment",
-    ) as HTMLSelectElement;
     const initialBoardModeSelect = document.querySelector(
         "#setting-initial-board-mode",
     ) as HTMLSelectElement;
@@ -378,7 +365,7 @@ function saveRoomSettings(): void {
         timeBonus,
         timeType: timeTypeSelect.value as TimeType,
         timeShared: timeSharedInput.checked,
-        playerAssignment: playerAssignmentSelect.value as PlayerAssignment,
+        playerAssignment: "random",
         initialBoard: getInitialBoardSetting(
             initialBoardModeSelect,
             initialBoardFenInput,
@@ -606,9 +593,6 @@ export function updateRoomSettingsUI(): void {
     const timeSharedInput = document.querySelector(
         "#setting-time-shared",
     ) as HTMLInputElement;
-    const playerAssignmentSelect = document.querySelector(
-        "#setting-player-assignment",
-    ) as HTMLSelectElement;
     const initialBoardModeSelect = document.querySelector(
         "#setting-initial-board-mode",
     ) as HTMLSelectElement;
@@ -640,7 +624,6 @@ export function updateRoomSettingsUI(): void {
     timeBonusInput.value = gs.room.game.config.timeBonus.toString();
     timeTypeSelect.value = gs.room.game.config.timeType;
     timeSharedInput.checked = gs.room.game.config.timeShared;
-    playerAssignmentSelect.value = gs.room.game.config.playerAssignment;
     setInitialBoardUI(
         initialBoardModeSelect,
         initialBoardFenInput,
@@ -651,7 +634,6 @@ export function updateRoomSettingsUI(): void {
     pawnDropRanksInput.value = gs.room.game.config.pawnDropRanks;
     pocketShareSelect.value = gs.room.game.config.pocketShare;
     syncHoverPreviewSelect(timeTypeSelect);
-    syncHoverPreviewSelect(playerAssignmentSelect);
     syncHoverPreviewSelect(initialBoardModeSelect);
     syncRoomVariantButtons(initialBoardModeSelect);
     syncHoverPreviewSelect(dropAggressionSelect);
@@ -672,7 +654,6 @@ export function updateRoomSettingsUI(): void {
         element.disabled = !editable;
     for (const select of [
         timeTypeSelect,
-        playerAssignmentSelect,
         initialBoardModeSelect,
         dropAggressionSelect,
         promotionTypeSelect,
@@ -889,6 +870,12 @@ export function updateUIPlayerList(): void {
             playerDiv.dataset.playerId = id;
             nameDiv.className = "player-name";
             nameDiv.textContent = getPlayerDisplayName(player);
+            if (id === gs.room.hostID) {
+                const hostBadge = document.createElement("span");
+                hostBadge.className = "host-badge";
+                hostBadge.textContent = " (Host)";
+                nameDiv.append(hostBadge);
+            }
             if (isCurrentPlayer)
                 nameDiv.style.fontWeight = "var(--font-weight-bold)";
             statsDiv.className = "player-stats";

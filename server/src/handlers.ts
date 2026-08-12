@@ -14,13 +14,22 @@ export function setupHandlers(socket: GameSocket): void {
         const trimmedName = name.trim().slice(0, 20);
         if (!trimmedName) return;
 
+        const room = socket.room;
+        const roomPlayer = room?.players.get(socket.player.id);
+        if (
+            room &&
+            roomPlayer &&
+            roomHasDisplayName(room, trimmedName, socket.player.id)
+        ) {
+            socket.emit("error", "That name is already taken in this room");
+            return;
+        }
+
         socket.player.name = trimmedName;
 
         const profile = profiles.get(socket.player.id);
         if (profile) profile.name = trimmedName;
 
-        const room = socket.room;
-        const roomPlayer = room?.players.get(socket.player.id);
         if (room && roomPlayer) {
             roomPlayer.name = trimmedName;
             io.to(room.code).emit(
@@ -85,6 +94,11 @@ export function setupHandlers(socket: GameSocket): void {
 
         const trimmedMessage = message.trim().slice(0, 200);
         if (!trimmedMessage) return;
+
+        if (trimmedMessage.toLowerCase().startsWith("/ban ")) {
+            handleBanCommand(socket, trimmedMessage.slice(5).trim());
+            return;
+        }
 
         const allChatPrefix = "/a ";
         const isAllChatOverride = trimmedMessage.startsWith(allChatPrefix);
@@ -312,6 +326,91 @@ function emitTeamChat(
     }
 }
 
+function handleBanCommand(socket: GameSocket, targetName: string): void {
+    const room = socket.room;
+    if (!room || !targetName) return;
+
+    if (room.hostID !== socket.player.id) {
+        emitServerChat(socket, "Only the host can ban players from this room.");
+        return;
+    }
+
+    const target = findPlayerByDisplayName(room, targetName);
+    if (!target) {
+        emitServerChat(socket, `No player named "${targetName}" is in this room.`);
+        return;
+    }
+
+    if (target.id === socket.player.id) {
+        emitServerChat(socket, "The host cannot ban themselves.");
+        return;
+    }
+
+    banPlayerFromRoom(room, target.id);
+    io.to(room.code).emit(
+        "p-sent-chat",
+        "server",
+        `${getPlayerDisplayName(target)} was banned from the room.`,
+    );
+}
+
+function banPlayerFromRoom(room: Room, playerID: string): void {
+    const vacatedSeats = getPlayerSeats(room, playerID);
+    room.bannedPlayerIDs.add(playerID);
+    room.removePlayer(playerID);
+
+    for (const connectedSocket of io.sockets.sockets.values()) {
+        const targetSocket = connectedSocket as GameSocket;
+        if (
+            targetSocket.player?.id !== playerID ||
+            targetSocket.room?.code !== room.code
+        )
+            continue;
+
+        targetSocket.leave(room.code);
+        targetSocket.room = undefined;
+        targetSocket.emit("banned-from-room", room.code);
+    }
+
+    io.to(room.code).emit("p-left-room", playerID);
+    for (const { boardID, color } of vacatedSeats)
+        io.to(room.code).emit("p-left-board", boardID, color);
+    io.to(room.code).emit("room-host-updated", room.hostID);
+}
+
+function emitServerChat(socket: GameSocket, message: string): void {
+    socket.emit("p-sent-chat", "server", message);
+}
+
+function findPlayerByDisplayName(
+    room: Room,
+    displayName: string,
+): Player | undefined {
+    const normalizedDisplayName = normalizeDisplayName(displayName);
+    for (const player of room.players.values())
+        if (normalizeDisplayName(getPlayerDisplayName(player)) === normalizedDisplayName)
+            return player;
+}
+
+function roomHasDisplayName(
+    room: Room,
+    displayName: string,
+    exceptPlayerID?: string,
+): boolean {
+    const normalizedDisplayName = normalizeDisplayName(displayName);
+    for (const player of room.players.values()) {
+        if (player.id === exceptPlayerID) continue;
+        if (normalizeDisplayName(getPlayerDisplayName(player)) === normalizedDisplayName)
+            return true;
+    }
+
+    return false;
+}
+
+function normalizeDisplayName(name: string): string {
+    return name.trim().toLocaleLowerCase();
+}
+
 function createRoom(roomCode?: string, hostID?: string): string | undefined {
     if (rooms.size >= 10_000) return;
 
@@ -329,8 +428,23 @@ function joinRoom(socket: GameSocket, code: string): void {
         return;
     }
 
+    if (room.bannedPlayerIDs.has(socket.player.id)) {
+        socket.emit("error", "You are banned from this room");
+        return;
+    }
+
     if (socket.room?.code === code || hasAnotherRoomConnection(socket, code)) {
         socket.emit("error", "You have already joined this room");
+        return;
+    }
+
+    if (room.status === RoomStatus.PLAYING)
+        for (const match of room.game.matches) match.updateTime(Date.now());
+
+    const playerInRoom = room.players.get(socket.player.id);
+    const duplicateNameExceptID = playerInRoom ? socket.player.id : undefined;
+    if (roomHasDisplayName(room, socket.player.name, duplicateNameExceptID)) {
+        socket.emit("error", "That name is already taken in this room");
         return;
     }
 
@@ -339,10 +453,6 @@ function joinRoom(socket: GameSocket, code: string): void {
     socket.join(code);
     socket.room = room;
 
-    if (room.status === RoomStatus.PLAYING)
-        for (const match of room.game.matches) match.updateTime(Date.now());
-
-    const playerInRoom = room.players.get(socket.player.id);
     if (playerInRoom) {
         playerInRoom.name = socket.player.name;
         playerInRoom.status = PlayerStatus.CONNECTED;

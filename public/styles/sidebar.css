@@ -249,6 +249,11 @@
    color: var(--text-secondary);
 }
 
+.host-badge {
+   color: var(--text-secondary);
+   font-weight: var(--font-weight-regular);
+}
+
 .winner-crown {
    flex: 0 0 auto;
    display: block;
