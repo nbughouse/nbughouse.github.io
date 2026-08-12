@@ -656,9 +656,18 @@
 }
 
 .chat-sender {
+   display: flex;
+   align-items: center;
+   gap: 0.5vh;
    margin-bottom: 0.25vh;
    font-weight: var(--font-weight-bold);
    font-size: 1.7vh;
+}
+
+.chat-badge {
+   flex: 0 0 auto;
+   width: 1.7vh;
+   height: 1.7vh;
 }
 
 .chat-text {

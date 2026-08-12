@@ -18,6 +18,7 @@ import {
     updateRoomSettingsUI,
     updateUIPlayerList,
     updateUIPushChat,
+    getPlayerPlaqueAppearance,
 } from "./game-ui";
 import { clearLastMoves, rememberLastMove } from "./chess-ui";
 import {
@@ -206,7 +207,14 @@ export function initGameSocket(): void {
     });
 
     gs.socket.on("p-sent-chat", (id: string, message: string) => {
-        gs.room.chat.push(id, message);
-        updateUIPushChat({ id, message });
+        const plaque = getPlayerPlaqueAppearance(id);
+        const chatMessage = gs.room.chat.push(
+            id,
+            message,
+            plaque.color,
+            plaque.opacity,
+            plaque.badges,
+        );
+        updateUIPushChat(chatMessage);
     });
 }

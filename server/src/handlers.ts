@@ -101,7 +101,8 @@ export function setupHandlers(socket: GameSocket): void {
         const sendToAll =
             socket.room.status !== RoomStatus.PLAYING ||
             isAllChatOverride ||
-            !team;
+            !team ||
+            !hasTeammate(socket.room, team, socket.player.id);
 
         if (sendToAll) {
             socket.room.chat.push(socket.player.id, outgoingMessage);
@@ -256,6 +257,15 @@ function getPlayerTeamInRoom(room: Room, playerID: string): Team | undefined {
         if (match.getPlayerTeam(Team.RED)?.id === playerID)
             return Team.RED;
     }
+}
+
+function hasTeammate(room: Room, team: Team, playerID: string): boolean {
+    for (const match of room.game.matches) {
+        const teammate = match.getPlayerTeam(team);
+        if (teammate && teammate.id !== playerID) return true;
+    }
+
+    return false;
 }
 
 function emitTeamChat(
