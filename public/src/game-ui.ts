@@ -7,7 +7,11 @@ import type {
     PromotionType,
     TimeType,
 } from "@shared/config";
-import { getPlayerDisplayName, PlayerStatus } from "@shared/player";
+import {
+    getPlayerDisplayName,
+    type Player,
+    PlayerStatus,
+} from "@shared/player";
 import { RoomStatus, type Team } from "@shared/room";
 import {
     clearLatestWinners,
@@ -725,8 +729,20 @@ function resetGameButtons(): void {
 export function updateUIPlayerList(): void {
     const playerList = document.querySelector("#player-list");
     if (playerList) {
+        const previousPlayerTops = new Map(
+            [...playerList.querySelectorAll<HTMLElement>(".player-item")].map(
+                (playerItem) => [
+                    playerItem.dataset.playerId,
+                    playerItem.getBoundingClientRect().top,
+                ],
+            ),
+        );
         playerList.innerHTML = "";
-        for (const [id, player] of gs.room.players) {
+        const playersByScore = [...gs.room.players].sort(
+            ([, playerA], [, playerB]) =>
+                comparePlayersByScore(playerA, playerB),
+        );
+        for (const [id, player] of playersByScore) {
             const playerDiv = document.createElement("div");
             const nameDiv = document.createElement("div");
             const statsDiv = document.createElement("div");
@@ -743,6 +759,7 @@ export function updateUIPlayerList(): void {
             const isCurrentPlayer = id === gs.player.id;
 
             playerDiv.className = `player-item ${statusClass}`;
+            playerDiv.dataset.playerId = id;
             nameDiv.className = "player-name";
             nameDiv.textContent = getPlayerDisplayName(player);
             if (isCurrentPlayer)
@@ -776,8 +793,40 @@ export function updateUIPlayerList(): void {
             playerDiv.append(statsDiv);
             playerList.append(playerDiv);
         }
+
+        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            for (const playerItem of playerList.querySelectorAll<HTMLElement>(
+                ".player-item",
+            )) {
+                const previousTop = previousPlayerTops.get(
+                    playerItem.dataset.playerId,
+                );
+                if (previousTop === undefined) continue;
+
+                const offset = previousTop - playerItem.getBoundingClientRect().top;
+                if (Math.abs(offset) < 1) continue;
+
+                playerItem.animate(
+                    [
+                        { transform: `translateY(${offset}px)` },
+                        { transform: "translateY(0)" },
+                    ],
+                    { duration: 250, easing: "ease-out" },
+                );
+            }
+        }
     }
     updateStartButton();
+}
+
+function comparePlayersByScore(
+    playerA: Pick<Player, "wins" | "total">,
+    playerB: Pick<Player, "wins" | "total">,
+): number {
+    const winRateA = playerA.total > 0 ? playerA.wins / playerA.total : 0;
+    const winRateB = playerB.total > 0 ? playerB.wins / playerB.total : 0;
+
+    return winRateB - winRateA || playerB.total - playerA.total;
 }
 
 // MARK: Chat UI
