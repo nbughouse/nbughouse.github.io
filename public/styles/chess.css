@@ -23,8 +23,8 @@
 
 #game-area {
    --square-size: 8.85vh;
-   --plaque-height-ratio: 0.4;
-   --plaque-height: calc(var(--square-size) * var(--plaque-height-ratio));
+   --board-size: calc(var(--square-size) * 8);
+   --plaque-height-board-ratio: 0.05;
    display: flex;
    position: relative;
    flex: 1;
@@ -60,6 +60,9 @@
 
 /* Match Container */
 .match-container {
+   --plaque-height: calc(
+      var(--board-size) * var(--plaque-height-board-ratio)
+   );
    display: flex;
    flex-direction: column;
    filter: drop-shadow(var(--shadow-soft));
@@ -151,7 +154,7 @@
 .pocket-piece.highlight {
    border-radius: var(--radius-sm);
    background-color: rgba(245, 197, 74, 0.82);
-   box-shadow: var(--shadow-button);
+   box-shadow: var(--shadow-bottom);
 }
 
 .pocket-count {
@@ -163,7 +166,7 @@
    padding: calc(var(--square-size) * 0.015) calc(var(--square-size) * 0.059);
    font-weight: var(--font-weight-bold);
    font-size: calc(var(--square-size) * 0.147);
-   box-shadow: var(--shadow-button);
+   box-shadow: var(--shadow-bottom);
 }
 
 .player-name-plaque {
@@ -176,7 +179,6 @@
    padding: calc(var(--square-size) * 0.075) calc(var(--square-size) * 0.28);
    min-width: calc(var(--square-size) * 2.65);
    height: var(--plaque-height);
-   min-height: var(--plaque-height);
    max-width: calc(100% - (var(--square-size) * 0.32));
    overflow: hidden;
    font-weight: var(--font-weight-bold);
@@ -403,7 +405,10 @@
 
 .piece.animating,
 .pocket-piece .piece.animating {
-   transition: transform 0.3s ease-out;
+   z-index: 5;
+   pointer-events: none;
+   transition: transform var(--piece-move-duration, 300ms) cubic-bezier(0.2, 0, 0, 1);
+   will-change: transform;
 }
 
 .dragged-piece {
@@ -457,7 +462,7 @@
    font-weight: var(--font-weight-bold);
    font-size: calc(var(--square-size) * 0.32);
    line-height: 1;
-   box-shadow: var(--shadow-button);
+   box-shadow: var(--shadow-bottom);
 }
 
 .player-time-display.white-clock {
@@ -483,10 +488,6 @@
 .clock-value {
    color: currentColor;
    font-variant-numeric: tabular-nums;
-}
-
-.player-info.active-player .player-time-display {
-   box-shadow: var(--shadow-button);
 }
 
 .player-info.own-player-seat {

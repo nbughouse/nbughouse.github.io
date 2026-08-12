@@ -249,6 +249,9 @@ function setupSettingsView(): void {
     const soundSelect = document.querySelector(
         "#menu-setting-sound-theme",
     ) as HTMLSelectElement;
+    const animationSpeedInput = document.querySelector(
+        "#menu-setting-piece-animation-speed",
+    ) as HTMLInputElement;
 
     backButton.addEventListener("click", () => {
         closeSettingsPickers();
@@ -269,6 +272,7 @@ function setupSettingsView(): void {
     setSelectValue("#menu-setting-board-theme", sn.settings.boardTheme);
     setSelectValue("#menu-setting-movement-mode", sn.settings.movementMode);
     setSelectValue("#menu-setting-sound-theme", sn.settings.soundTheme);
+    animationSpeedInput.value = sn.settings.pieceAnimationSpeed.toString();
 
     createHoverPreviewSelect(pieceSelect, pieceThemeOptions, (value) => {
         sn.settings.pieceTheme = value;
@@ -298,6 +302,13 @@ function setupSettingsView(): void {
 
     soundSelect.addEventListener("change", () => {
         sn.settings.soundTheme = soundSelect.value as SoundTheme;
+        saveMenuSettings(false);
+    });
+
+    animationSpeedInput.addEventListener("input", () => {
+        sn.settings.pieceAnimationSpeed = Number.parseFloat(
+            animationSpeedInput.value,
+        );
         saveMenuSettings(false);
     });
 
@@ -395,6 +406,11 @@ function updateMenuSettingsUI(): void {
     setCheckbox("#menu-setting-legal-moves", settings.showLegalMoves);
     setCheckbox("#menu-setting-message-grouping", settings.messageGrouping);
     setCheckbox("#menu-setting-dual-board-ui", settings.dualBoardUI);
+    const animationSpeedInput = document.querySelector(
+        "#menu-setting-piece-animation-speed",
+    ) as HTMLInputElement | null;
+    if (animationSpeedInput)
+        animationSpeedInput.value = settings.pieceAnimationSpeed.toString();
 }
 
 function setSelectValue(selector: string, value: string): void {

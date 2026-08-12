@@ -154,7 +154,7 @@ export function setupHandlers(socket: GameSocket): void {
 
         if (
             board.getPlayer(color)?.id !== socket.player.id ||
-            !board.chess.isLegal(move, false)
+            !board.chess.isLegal(move, false, socket.room.game.getMoveRules())
         )
             return;
 
@@ -169,7 +169,19 @@ export function setupHandlers(socket: GameSocket): void {
             currentTime,
         );
 
-        if (board.chess.isCheckmate()) {
+        const kingWinner = socket.room.game.checkKingAccumulation();
+        if (kingWinner) {
+            socket.room.endRoom(kingWinner);
+            io.to(socket.room.code).emit(
+                "ended-room",
+                kingWinner,
+                `${kingWinner === Team.BLUE ? "Blue" : "Red"} captured all kings!`,
+                currentTime,
+            );
+        } else if (
+            !socket.room.game.getMoveRules().allowKingCapture &&
+            board.chess.isCheckmate()
+        ) {
             const winningTeam = board.getTeam(color);
             const winner = board.getPlayer(color);
             if (!winner) return;
@@ -195,10 +207,17 @@ export function setupHandlers(socket: GameSocket): void {
     });
 
     socket.on("toggle-spectator", () => {
-        if (!socket.room || socket.room.status !== RoomStatus.LOBBY) return;
+        if (
+            !socket.room ||
+            (socket.room.status !== RoomStatus.LOBBY &&
+                socket.room.status !== RoomStatus.PLAYING)
+        )
+            return;
 
         const player = socket.room.getPlayer(socket.player.id);
         if (!player) return;
+        if (socket.room.status === RoomStatus.PLAYING && getPlayerTeam(socket))
+            return;
 
         if (player.status === PlayerStatus.SPECTATING) {
             player.status = PlayerStatus.CONNECTED;
@@ -206,6 +225,16 @@ export function setupHandlers(socket: GameSocket): void {
                 "p-set-status",
                 socket.player.id,
                 PlayerStatus.CONNECTED,
+            );
+            return;
+        }
+
+        if (socket.room.status === RoomStatus.PLAYING) {
+            player.status = PlayerStatus.SPECTATING;
+            io.to(socket.room.code).emit(
+                "p-set-status",
+                socket.player.id,
+                PlayerStatus.SPECTATING,
             );
             return;
         }

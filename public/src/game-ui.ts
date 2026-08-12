@@ -113,6 +113,10 @@ function initSidebarTabs(): void {
     const settingsPanel = document.querySelector("#settings-tab-panel");
     const chatSection = document.querySelector("#chat-section");
     const moreSettingsButton = document.querySelector("#more-room-settings-btn");
+    const variantsButton = document.querySelector("#room-variants-btn");
+    const variantButtons = document.querySelectorAll<HTMLButtonElement>(
+        ".room-variant-button",
+    );
 
     playersTabButton?.addEventListener("click", () => {
         sidebarTabs?.classList.remove("settings-active");
@@ -121,6 +125,7 @@ function initSidebarTabs(): void {
         playersPanel?.classList.remove("hidden");
         settingsPanel?.classList.add("hidden");
         setMoreRoomSettingsOpen(false);
+        setRoomVariantsOpen(false);
         chatSection?.classList.remove("hidden");
     });
 
@@ -131,12 +136,22 @@ function initSidebarTabs(): void {
         settingsPanel?.classList.remove("hidden");
         playersPanel?.classList.add("hidden");
         setMoreRoomSettingsOpen(false);
+        setRoomVariantsOpen(false);
         updateRoomSettingsUI();
     });
 
     moreSettingsButton?.addEventListener("click", () => {
         const moreSettings = document.querySelector("#more-room-settings");
-        setMoreRoomSettingsOpen(moreSettings?.classList.contains("hidden") ?? true);
+        const open = moreSettings?.classList.contains("hidden") ?? true;
+        if (open) setRoomVariantsOpen(false);
+        setMoreRoomSettingsOpen(open);
+    });
+    variantsButton?.addEventListener("click", () => {
+        const variantButtonsPanel = document.querySelector("#room-variant-buttons");
+        const open = variantButtonsPanel?.classList.contains("hidden") ?? true;
+
+        setMoreRoomSettingsOpen(false);
+        setRoomVariantsOpen(open);
     });
 
     const timeBonusInput = document.querySelector("#setting-time-bonus");
@@ -184,7 +199,33 @@ function initSidebarTabs(): void {
             initialBoardModeSelect,
             initialBoardFenInput,
         );
+        syncRoomVariantButtons(initialBoardModeSelect);
     });
+    for (const variantButton of variantButtons) {
+        variantButton.addEventListener("click", () => {
+            const variant = variantButton.dataset.initialBoard;
+            if (!variant) return;
+
+            if (
+                !initialBoardModeSelect ||
+                !initialBoardFenInput ||
+                !canEditRoomSettings()
+            )
+                return;
+
+            initialBoardModeSelect.value = toggleInitialBoardVariant(
+                initialBoardModeSelect.value,
+                variant,
+            );
+            syncInitialBoardFenVisibility(
+                initialBoardModeSelect,
+                initialBoardFenInput,
+            );
+            syncHoverPreviewSelect(initialBoardModeSelect);
+            syncRoomVariantButtons(initialBoardModeSelect);
+            flushRoomSettingsSave();
+        });
+    }
 
     createSettingsSelect(
         document.querySelector("#setting-player-assignment") as HTMLSelectElement,
@@ -207,10 +248,13 @@ function initSidebarTabs(): void {
         [
             { value: "default", label: "Default" },
             { value: "960", label: "Chess960" },
+            { value: "koedem", label: "Koedem" },
+            { value: "960+koedem", label: "Chess960 + Koedem" },
             { value: "custom", label: "Custom FEN" },
         ],
     );
     syncInitialBoardFenVisibility(initialBoardModeSelect, initialBoardFenInput);
+    syncRoomVariantButtons(initialBoardModeSelect);
 
     createSettingsSelect(
         document.querySelector("#setting-drop-aggression") as HTMLSelectElement,
@@ -255,6 +299,18 @@ function setMoreRoomSettingsOpen(open: boolean): void {
     moreSettingsButton?.setAttribute("aria-expanded", open.toString());
     if (moreSettingsButton)
         moreSettingsButton.textContent = open ? "Less settings" : "More settings";
+}
+
+function setRoomVariantsOpen(open: boolean): void {
+    const variantsButton = document.querySelector("#room-variants-btn");
+    const variantButtonsPanel = document.querySelector("#room-variant-buttons");
+    const chatMessages = document.querySelector("#chat-messages");
+    const chatSection = document.querySelector("#chat-section");
+
+    variantButtonsPanel?.classList.toggle("hidden", !open);
+    chatMessages?.classList.toggle("hidden", open);
+    chatSection?.classList.toggle("variants-open", open);
+    variantsButton?.setAttribute("aria-expanded", open.toString());
 }
 
 function queueRoomSettingsSave(): void {
@@ -571,6 +627,12 @@ export function updateRoomSettingsUI(): void {
     const pocketShareSelect = document.querySelector(
         "#setting-pocket-share",
     ) as HTMLSelectElement;
+    const variantsButton = document.querySelector(
+        "#room-variants-btn",
+    ) as HTMLButtonElement;
+    const variantButtons = document.querySelectorAll<HTMLButtonElement>(
+        ".room-variant-button",
+    );
     const note = document.querySelector("#room-settings-note") as HTMLElement;
 
     matchInput.value = gs.room.game.config.matchNum.toString();
@@ -591,6 +653,7 @@ export function updateRoomSettingsUI(): void {
     syncHoverPreviewSelect(timeTypeSelect);
     syncHoverPreviewSelect(playerAssignmentSelect);
     syncHoverPreviewSelect(initialBoardModeSelect);
+    syncRoomVariantButtons(initialBoardModeSelect);
     syncHoverPreviewSelect(dropAggressionSelect);
     syncHoverPreviewSelect(promotionTypeSelect);
     syncHoverPreviewSelect(pocketShareSelect);
@@ -603,6 +666,8 @@ export function updateRoomSettingsUI(): void {
         timeSharedInput,
         initialBoardFenInput,
         pawnDropRanksInput,
+        variantsButton,
+        ...variantButtons,
     ])
         element.disabled = !editable;
     for (const select of [
@@ -626,6 +691,51 @@ export function updateRoomSettingsUI(): void {
               : "Only the host can change lobby settings.";
 }
 
+function syncRoomVariantButtons(
+    initialBoardModeSelect: HTMLSelectElement | null,
+): void {
+    const activeVariants = parseInitialBoardVariants(
+        initialBoardModeSelect?.value ?? "default",
+    );
+
+    for (const variantButton of document.querySelectorAll<HTMLButtonElement>(
+        ".room-variant-button",
+    )) {
+        variantButton.setAttribute(
+            "aria-pressed",
+            activeVariants.has(variantButton.dataset.initialBoard ?? "").toString(),
+        );
+    }
+}
+
+function toggleInitialBoardVariant(
+    initialBoard: string,
+    variant: string,
+): string {
+    const variants = parseInitialBoardVariants(initialBoard);
+
+    if (variants.has(variant)) variants.delete(variant);
+    else variants.add(variant);
+
+    return serializeInitialBoardVariants(variants);
+}
+
+function parseInitialBoardVariants(initialBoard: string): Set<string> {
+    const normalized = initialBoard === "random" ? "960" : initialBoard;
+    return new Set(
+        normalized
+            .split("+")
+            .filter((current) => current === "960" || current === "koedem"),
+    );
+}
+
+function serializeInitialBoardVariants(variants: Set<string>): string {
+    const orderedVariants = ["960", "koedem"].filter((variant) =>
+        variants.has(variant),
+    );
+    return orderedVariants.length ? orderedVariants.join("+") : "default";
+}
+
 function setInitialBoardUI(
     modeSelect: HTMLSelectElement,
     fenInput: HTMLInputElement,
@@ -634,6 +744,8 @@ function setInitialBoardUI(
     if (
         initialBoard === "default" ||
         initialBoard === "960" ||
+        initialBoard === "koedem" ||
+        initialBoard === "960+koedem" ||
         initialBoard === "random"
     ) {
         modeSelect.value = initialBoard === "random" ? "960" : initialBoard;
@@ -674,6 +786,8 @@ export function updateStartButton(): void {
         "#spectator-btn-icon",
     ) as HTMLImageElement;
 
+    const isPlaying = gs.room?.status === RoomStatus.PLAYING;
+    const isCurrentPlayerPlaying = isPlayerInGame();
     const isHost =
         gs.room?.status === RoomStatus.LOBBY && gs.room.hostID === gs.player.id;
     const isLobby = gs.room?.status === RoomStatus.LOBBY;
@@ -684,7 +798,11 @@ export function updateStartButton(): void {
     ).length;
     const isWaitingForPlayers = playerCount <= 1;
 
-    if (isHost && isWaitingForPlayers) {
+    if (isPlaying) {
+        readyButton.textContent = "Waiting for next round...";
+        readyButton.disabled = true;
+        readyButton.classList.add("waiting");
+    } else if (isHost && isWaitingForPlayers) {
         readyButton.textContent = "Waiting for people...";
         readyButton.disabled = true;
         readyButton.classList.add("waiting");
@@ -698,12 +816,16 @@ export function updateStartButton(): void {
         readyButton.classList.add("waiting");
     }
 
-    spectatorButton.hidden = !isLobby;
-    spectatorButton.setAttribute(
-        "aria-label",
-        isSpectating ? "Return to game" : "Spectate",
-    );
-    spectatorButton.title = isSpectating ? "Return to game" : "Spectate";
+    spectatorButton.hidden = !isLobby && !(isPlaying && !isCurrentPlayerPlaying);
+    const spectatorLabel = isPlaying
+        ? isSpectating
+            ? "Play next round"
+            : "Spectate next round"
+        : isSpectating
+          ? "Return to game"
+          : "Spectate";
+    spectatorButton.setAttribute("aria-label", spectatorLabel);
+    spectatorButton.title = spectatorLabel;
     spectatorButton.classList.toggle("is-spectating", isSpectating);
     spectatorButtonIcon.src = getAssetPath(
         isSpectating ? "img/pawn.svg" : "img/eye.svg",
@@ -747,20 +869,23 @@ export function updateUIPlayerList(): void {
             const nameDiv = document.createElement("div");
             const statsDiv = document.createElement("div");
             const scoreText = document.createElement("span");
-            const isSpectating =
-                player.status === PlayerStatus.SPECTATING;
-            const statusClass =
+            const isDisplayedAsSpectator = isPlayerDisplayedAsInactive(
+                id,
+                player,
+            );
+            const isTrueSpectator = isPlayerDisplayedAsSpectator(id, player);
+            const statusClasses = [
                 player.status === PlayerStatus.DISCONNECTED
                     ? "status-disconnected"
-                    : isSpectating
-                      ? "status-spectating"
-                    : "";
+                    : "",
+                isDisplayedAsSpectator ? "status-spectating" : "",
+            ].filter(Boolean);
 
             const isCurrentPlayer = id === gs.player.id;
 
             const relationshipClass = getPlayerRelationshipClass(id);
             playerDiv.className =
-                `player-item ${statusClass} ${relationshipClass}`.trim();
+                `player-item ${statusClasses.join(" ")} ${relationshipClass}`.trim();
             playerDiv.dataset.playerId = id;
             nameDiv.className = "player-name";
             nameDiv.textContent = getPlayerDisplayName(player);
@@ -777,7 +902,7 @@ export function updateUIPlayerList(): void {
             scoreText.textContent = `${player.wins}/${player.total}`;
             statsDiv.append(scoreText);
 
-            if (isSpectating) {
+            if (isTrueSpectator) {
                 const spectatingIcon = document.createElement("img");
                 spectatingIcon.className = "spectating-icon";
                 spectatingIcon.src = getAssetPath("img/eye.svg");
@@ -993,6 +1118,7 @@ function getCSSColor(property: string): string {
 
 function getPlayerRelationshipClass(playerID: string): string {
     if (playerID === "server") return "";
+    if (isPlayerDisplayedAsInactive(playerID)) return "";
     if (playerID === gs.player.id) return "own";
 
     const ownTeam = getPlayerTeam(gs.player.id);
@@ -1000,6 +1126,25 @@ function getPlayerRelationshipClass(playerID: string): string {
     if (!ownTeam || !playerTeam) return "";
 
     return ownTeam === playerTeam ? "teammate" : "opponent";
+}
+
+function isPlayerDisplayedAsInactive(
+    playerID: string,
+    player = gs.room.players.get(playerID),
+): boolean {
+    if (!player) return false;
+    return (
+        isPlayerDisplayedAsSpectator(playerID, player) ||
+        (gs.room.status === RoomStatus.PLAYING && !getPlayerTeam(playerID))
+    );
+}
+
+function isPlayerDisplayedAsSpectator(
+    playerID: string,
+    player = gs.room.players.get(playerID),
+): boolean {
+    if (!player || player.status !== PlayerStatus.SPECTATING) return false;
+    return !getPlayerTeam(playerID);
 }
 
 function getPlayerTeam(playerID: string): Team | undefined {
@@ -1220,14 +1365,14 @@ function updateGridLayout(): void {
         readPixelValue(style.paddingBottom);
     const columnGap = readPixelValue(style.columnGap);
     const rowGap = readPixelValue(style.rowGap);
-    const plaqueHeightRatio = readPixelValue(
-        style.getPropertyValue("--plaque-height-ratio"),
+    const plaqueHeightBoardRatio = readPixelValue(
+        style.getPropertyValue("--plaque-height-board-ratio"),
     );
 
     // The match itself is 8 squares wide by 10 high. In grid mode, the two
     // externally positioned player plaques are also part of its visual height.
     const matchRatio = 8 / 10;
-    const visualRatio = 8 / (10 + plaqueHeightRatio * 2);
+    const visualRatio = 8 / (10 + plaqueHeightBoardRatio * 16);
 
     let bestW = 0;
     let bestCols = 1;
@@ -1281,6 +1426,7 @@ function updateGridLayout(): void {
             element.style.order = isPrimary ? "0" : "1";
             element.style.width = `${width}px`;
             element.style.height = `${width * (1 / matchRatio)}px`;
+            element.style.setProperty("--board-size", `${width}px`);
             element.style.setProperty("--square-size", `${width / 8}px`);
         }
         return;
@@ -1294,6 +1440,7 @@ function updateGridLayout(): void {
         // Apply the calculated width, height follows aspect ratio
         m.style.width = `${bestW}px`;
         m.style.height = `${bestW * (1 / matchRatio)}px`;
+        m.style.setProperty("--board-size", `${bestW}px`);
         m.style.setProperty("--square-size", `${bestW / 8}px`);
     }
 }
@@ -1309,6 +1456,7 @@ function resetToFlexLayout(): void {
         m.style.order = "";
         m.style.width = "";
         m.style.height = "";
+        m.style.removeProperty("--board-size");
         m.style.removeProperty("--square-size");
     }
 }
@@ -1354,9 +1502,10 @@ export function startGameUI(): void {
         lobbyActionRow.style.display = "none";
         resignButton.style.display = "block";
     } else {
-        lobbyActionRow.style.display = "none";
+        lobbyActionRow.style.display = "flex";
         resignButton.style.display = "none";
     }
+    updateStartButton();
 
     // Put current player on bottom
     let topBottomDelta = 0; // # of this player on top - # on bottom

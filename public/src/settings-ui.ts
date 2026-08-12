@@ -103,7 +103,7 @@ export function createSettingsSelect(
 
     for (const option of orderedOptions) {
         const item = document.createElement("button");
-        item.className = "settings-picker-option";
+        item.className = "settings-picker-option button-flat";
         item.type = "button";
         item.textContent = option.label;
         item.dataset.value = option.value;

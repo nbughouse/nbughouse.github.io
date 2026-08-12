@@ -43,27 +43,17 @@
 }
 
 #leave-game-btn {
-   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--red-dark);
-
    position: relative;
    display: flex;
    justify-content: center;
    align-items: center;
-   cursor: pointer;
-   border: none;
-   border-radius: var(--radius-md);
-   background: var(--red);
+   --button-color: var(--red);
    padding: 0;
    width: 3.75vh;
    height: 3.75vh;
    color: var(--text);
    font-size: 0;
    line-height: 1;
-   box-shadow: var(--shadow-button);
-}
-
-#leave-game-btn:hover:not(:disabled) {
-   background: var(--red-dark);
 }
 
 #leave-game-btn::before {
@@ -129,7 +119,6 @@
    --sidebar-tab-padding: 0.5vh;
    --sidebar-tab-gap: 0.5vh;
    --sidebar-pill-x: 0;
-   --sidebar-pill-shadow: var(--shadow-button-side);
 
    display: grid;
    position: relative;
@@ -150,7 +139,7 @@
    background: var(--surface-muted);
    width: calc((100% - (var(--sidebar-tab-padding) * 2) - var(--sidebar-tab-gap)) / 2);
    height: calc(100% - (var(--sidebar-tab-padding) * 2));
-   box-shadow: var(--sidebar-pill-shadow);
+   box-shadow: var(--shadow-bottom);
    transform: translateX(var(--sidebar-pill-x));
    transition:
       transform 180ms ease,
@@ -216,17 +205,11 @@
    font-weight: var(--font-weight-bold);
    font-size: 1.85vh;
    line-height: 1.1;
-   box-shadow: var(--shadow-button);
+   box-shadow: var(--shadow-bottom);
 }
 
 .player-item.status-disconnected {
    background: var(--surface);
-}
-
-.player-item.status-spectating {
-   border: none;
-   background: var(--surface);
-   opacity: 0.4;
 }
 
 .player-item.own {
@@ -237,8 +220,10 @@
    background: var(--blue);
 }
 
-.player-item.opponent {
-   background: var(--red);
+.player-item.status-spectating {
+   border: none;
+   background: var(--surface);
+   opacity: 0.4;
 }
 
 .spectating-icon {
@@ -299,19 +284,15 @@
 }
 
 .room-settings-more-btn {
-   cursor: pointer;
-   border: none;
-   border-radius: var(--radius-md);
-   background: var(--surface);
+   --button-color: var(--surface);
+
    padding: 0.9vh 1vh;
    width: 100%;
-   font-weight: var(--font-weight-bold);
    font-size: 1.7vh;
-   box-shadow: var(--shadow-button);
 }
 
 .room-settings-more-btn[aria-expanded="true"] {
-   background: var(--surface-raised);
+   --button-color: var(--surface-raised);
 }
 
 .settings-field {
@@ -333,7 +314,6 @@
    min-width: 0;
    color: inherit;
    font-size: 1.85vh;
-   box-shadow: var(--shadow-button);
 }
 
 .settings-field select {
@@ -371,25 +351,22 @@
 }
 
 .settings-picker-button {
+   --button-color: var(--surface);
+
    display: flex;
    align-items: center;
    justify-content: space-between;
-   border: none;
-   border-radius: var(--radius-md);
-   background-color: var(--surface);
    padding: 0.85vh 2.4vh 0.85vh 1vh;
    width: 100%;
    min-width: 0;
    height: 100%;
    color: inherit;
-   font-weight: var(--font-weight-bold);
    font-size: 1.65vh;
    line-height: 1.1;
    text-align: left;
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-   box-shadow: var(--shadow-button);
 }
 
 .settings-picker-button::after {
@@ -433,13 +410,10 @@
 }
 
 .settings-picker-option {
-   border: none;
-   outline: none;
    border-radius: var(--radius-sm);
    background: transparent;
    padding: 0.75vh 0.9vh;
    color: inherit;
-   font-weight: var(--font-weight-bold);
    font-size: 1.65vh;
    line-height: 1.1;
    text-align: left;
@@ -450,8 +424,6 @@
 }
 
 .settings-picker-option.selected {
-   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--green-dark);
-
    background: var(--green);
    color: var(--text);
 }
@@ -461,8 +433,7 @@
 }
 
 .settings-field input:disabled,
-.settings-field select:disabled,
-.settings-picker-button:disabled {
+.settings-field select:disabled {
    opacity: 0.65;
    cursor: not-allowed;
 }
@@ -486,7 +457,7 @@
    font-weight: var(--font-weight-bold);
    font-size: 1.5vh;
    line-height: 1.1;
-   box-shadow: var(--shadow-button);
+   box-shadow: var(--shadow-bottom);
 }
 
 .settings-toggle span {
@@ -508,6 +479,46 @@
    justify-content: center;
    background: transparent;
    box-shadow: none;
+}
+
+.room-variants-btn {
+   --button-color: var(--blue);
+
+   padding: 0.9vh 1vh;
+   width: 100%;
+   font-size: 1.7vh;
+}
+
+.room-variants-btn[aria-expanded="true"] {
+   --button-color: color-mix(in srgb, var(--blue), white 12%);
+}
+
+.room-variant-buttons {
+   display: grid;
+   grid-template-columns: repeat(2, minmax(0, 1fr));
+   align-content: start;
+   gap: 1.25vh;
+   min-height: 0;
+}
+
+.room-variant-button {
+   --button-color: var(--surface);
+
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 100%;
+   min-width: 0;
+   height: 7.25vh;
+   padding: 1vh;
+   font-weight: 800;
+   font-size: 2vh;
+   line-height: 1;
+}
+
+.room-variant-button[aria-pressed="true"] {
+   --button-color: var(--green);
+   color: var(--text);
 }
 
 .settings-divider {
@@ -536,31 +547,21 @@
 }
 
 #ready-btn {
-   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--green-dark);
+   --button-color: var(--green);
 
    flex: 1 1 auto;
-   cursor: pointer;
-   border: none;
-   border-radius: var(--radius-md);
-   background: var(--green);
    padding: 1vh 0;
-   font-weight: var(--font-weight-bold);
    font-size: 2vh;
 }
 
 #spectator-btn {
    flex: 0 0 4.4vh;
-   cursor: pointer;
    display: flex;
    align-items: center;
    justify-content: center;
-   border: none;
-   border-radius: var(--radius-md);
-   background: var(--surface-raised);
    padding: 0;
    width: 4.4vh;
    min-width: 4.4vh;
-   box-shadow: var(--shadow-button);
 }
 
 #spectator-btn img {
@@ -569,32 +570,22 @@
    opacity: 0.86;
 }
 
-#spectator-btn:hover {
-   background: var(--accent);
-}
-
 #ready-btn.waiting,
 #ready-btn:disabled {
-   --shadow-button-side: 0 var(--shadow-bottom-size) 0 rgba(0, 0, 0, 0.18);
+   --button-color: var(--surface-raised);
 
    cursor: default;
-   background: var(--surface-raised);
    color: var(--hidden-text);
 }
 
 #resign-btn {
-   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--red-dark);
+   --button-color: var(--red);
 
-   cursor: pointer;
    display: none;
    margin: var(--sidebar-section-gap) var(--sidebar-margin) 0
       var(--sidebar-margin);
-   border: none;
-   border-radius: var(--radius-md);
-   background: var(--red);
    padding: 1vh 0;
    width: calc(100% - (var(--sidebar-margin) * 2));
-   font-weight: var(--font-weight-bold);
    font-size: 2vh;
 }
 
@@ -632,7 +623,7 @@
    font-size: 1.85vh;
    word-wrap: break-word;
    background: var(--primary);
-   box-shadow: var(--shadow-button);
+   box-shadow: var(--shadow-bottom);
 }
 
 .chat-message.own {
@@ -644,7 +635,7 @@
 }
 
 .chat-message.opponent {
-   background: var(--red);
+   background: var(--surface);
 }
 
 .chat-message.server {

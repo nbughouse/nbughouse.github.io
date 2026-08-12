@@ -14,21 +14,14 @@
    display: flex;
    justify-content: center;
    align-items: center;
-   cursor: pointer;
-   border: none;
-   outline: none;
-   border-radius: var(--radius-md);
-   background: var(--surface-raised);
    padding: 0;
    width: 6vh;
    height: 4vh;
    font-size: 2vh;
-   box-shadow: var(--shadow-button);
 }
 
 .scroll-btn:disabled {
    opacity: 0.3;
-   cursor: not-allowed;
 }
 
 .scroll-indicator {
@@ -37,25 +30,18 @@
    background: var(--secondary);
    padding: 0.75vh 1.5vh;
    font-size: 2.5vh;
-   box-shadow: var(--shadow-button);
 }
 
 #grid-toggle-btn {
    display: flex;
    justify-content: center;
    align-items: center;
-   cursor: pointer;
    margin: 0;
-   border: none;
-   outline: none;
-   border-radius: var(--radius-md);
-   background: var(--surface-raised);
    padding: 0;
    width: 4vh;
    height: 4vh;
    overflow: hidden;
    font-size: 0;
-   box-shadow: var(--shadow-button);
 }
 
 #grid-toggle-btn svg {
@@ -80,25 +66,13 @@
 }
 
 .promotion-option {
+   --button-color: var(--surface);
+
    display: block;
    width: 80px;
    height: 80px;
-   cursor: pointer;
-   border: none;
-   outline: none;
-   border-radius: var(--radius-md);
-   background: var(--surface);
    background-repeat: no-repeat;
    background-position: center;
    background-size: contain;
    padding: 6px;
-   box-shadow: var(--shadow-button);
-}
-
-.promotion-option:hover {
-   transform: scale(1.1);
-}
-
-.promotion-option:active {
-   transform: scale(1.05);
 }

@@ -50,6 +50,10 @@ interface VisualChessState {
 
 const visualChessStates: Map<number, VisualChessState> = new Map();
 const lastMoves: Map<number, Move> = new Map();
+const lastMoveAnimationSerials: Map<number, number> = new Map();
+const animatedMoveSerials: Map<number, number> = new Map();
+const suppressedMoveAnimations: Map<number, string[]> = new Map();
+let nextMoveAnimationSerial = 1;
 
 interface BoardArrow {
     from: BoardPosition;
@@ -455,13 +459,14 @@ function deselectPiece(): void {
 
 function executeMove(id: number, move: Move, premove: boolean): void {
     const board = getVisualChess(id).chess;
+    const rules = gs.room.game.getMoveRules();
 
     if (!premove) gs.socket.emit("move-board", id, selected!.piece.color, move);
 
     gs.room.game.matches[id].queued.color = selected!.piece.color;
     gs.room.game.matches[id].queued.moves.push(move);
 
-    playMoveSound(board.getLegalMoveType(move, premove));
+    playMoveSound(board.getLegalMoveType(move, premove, rules));
 
     deselectPiece();
 }
@@ -478,7 +483,7 @@ function attemptMove(id: number, to: Position): boolean {
     const premove = board.turn !== board.getPiece(move.from)?.color;
 
     if (premove && !gs.settings.premoves) return false;
-    if (!board.isLegal(move, premove)) return false;
+    if (!board.isLegal(move, premove, gs.room.game.getMoveRules())) return false;
 
     // Check if this is a promotion move
     if (
@@ -582,6 +587,8 @@ export function updateUIChess(id: number): void {
         }
     }
 
+    animateLastMove(id);
+
     const topColor = flipped ? Color.WHITE : Color.BLACK;
     const bottomColor = flipped ? Color.BLACK : Color.WHITE;
 
@@ -594,6 +601,84 @@ export function updateUIChess(id: number): void {
     );
 
     updateAnnotations(id);
+}
+
+function animateLastMove(boardID: number): void {
+    const move = lastMoves.get(boardID);
+    const serial = lastMoveAnimationSerials.get(boardID);
+    if (!move || !serial || animatedMoveSerials.get(boardID) === serial) return;
+
+    animatedMoveSerials.set(boardID, serial);
+
+    if (move.from.loc !== "board" || move.to.loc !== "board") return;
+
+    const speed = gs.settings.pieceAnimationSpeed;
+    if (speed <= 0) return;
+
+    const fromSquare = getSquareElement(boardID, move.from);
+    const toSquare = getSquareElement(boardID, move.to);
+    const pieceElement = toSquare.querySelector(".piece") as HTMLElement | null;
+    if (!pieceElement) return;
+
+    const fromRect = fromSquare.getBoundingClientRect();
+    const toRect = toSquare.getBoundingClientRect();
+    const duration = Math.round(300 / speed);
+
+    pieceElement.classList.add("animating");
+    pieceElement.style.setProperty("--piece-move-duration", `${duration}ms`);
+    pieceElement.style.transition = "none";
+    pieceElement.style.transform = `translate(${fromRect.left - toRect.left}px, ${
+        fromRect.top - toRect.top
+    }px)`;
+    pieceElement.getBoundingClientRect();
+
+    window.requestAnimationFrame(() => {
+        pieceElement.style.transition =
+            "transform var(--piece-move-duration) cubic-bezier(0.2, 0, 0, 1)";
+        pieceElement.style.transform = "translate(0, 0)";
+    });
+
+    const cleanup = () => {
+        pieceElement.classList.remove("animating");
+        pieceElement.style.removeProperty("--piece-move-duration");
+        pieceElement.style.transition = "";
+        pieceElement.style.transform = "";
+    };
+
+    pieceElement.addEventListener("transitionend", cleanup, { once: true });
+    window.setTimeout(cleanup, duration + 50);
+}
+
+function suppressMoveAnimation(boardID: number, move: Move): void {
+    const suppressedMoves = suppressedMoveAnimations.get(boardID) || [];
+    suppressedMoves.push(getMoveAnimationKey(move));
+    suppressedMoveAnimations.set(boardID, suppressedMoves);
+}
+
+function shouldSuppressMoveAnimation(boardID: number, move: Move): boolean {
+    const suppressedMoves = suppressedMoveAnimations.get(boardID);
+    if (!suppressedMoves) return false;
+
+    const key = getMoveAnimationKey(move);
+    const index = suppressedMoves.indexOf(key);
+    if (index < 0) return false;
+
+    suppressedMoves.splice(index, 1);
+    if (suppressedMoves.length === 0) suppressedMoveAnimations.delete(boardID);
+
+    return true;
+}
+
+function getMoveAnimationKey(move: Move): string {
+    return `${getPositionAnimationKey(move.from)}>${getPositionAnimationKey(
+        move.to,
+    )}:${move.promotion || ""}`;
+}
+
+function getPositionAnimationKey(pos: Position): string {
+    return pos.loc === "board"
+        ? `b:${pos.row}:${pos.col}`
+        : `p:${pos.color}:${pos.type}`;
 }
 
 function updatePocket(
@@ -610,6 +695,7 @@ function updatePocket(
     pocket.dataset.id = boardID.toString();
 
     const pieceOrder = [
+        PieceType.KING,
         PieceType.PAWN,
         PieceType.KNIGHT,
         PieceType.BISHOP,
@@ -744,7 +830,7 @@ function updateAnnotations(id: number): void {
         for (let r = 0; r < 8; r++) {
             for (let c = 0; c < 8; c++) {
                 const move = { from: pos, to: createPosition(r, c) };
-                if (chess.isLegal(move, premove))
+                if (chess.isLegal(move, premove, gs.room.game.getMoveRules()))
                     annotateSquare(id, r, c, ["legal-move"]);
             }
         }
@@ -870,10 +956,21 @@ function playMoveSound(type: MoveType): void {
 
 export function rememberLastMove(boardID: number, move: Move): void {
     lastMoves.set(boardID, move);
+    const serial = nextMoveAnimationSerial++;
+    lastMoveAnimationSerials.set(boardID, serial);
+    if (shouldSuppressMoveAnimation(boardID, move)) {
+        animatedMoveSerials.set(boardID, serial);
+        return;
+    }
+
+    animatedMoveSerials.delete(boardID);
 }
 
 export function clearLastMoves(): void {
     lastMoves.clear();
+    lastMoveAnimationSerials.clear();
+    animatedMoveSerials.clear();
+    suppressedMoveAnimations.clear();
     closePromotionDialog();
 }
 
@@ -968,7 +1065,7 @@ function handleSquareMouseUp(event: MouseEvent): void {
         dropSelectedPiece();
         return;
     }
-    const result = board.isLegal(move, premove);
+    const result = board.isLegal(move, premove, gs.room.game.getMoveRules());
 
     if (result && gs.settings.movementMode !== "click") {
         // Check if this is a promotion move
@@ -979,16 +1076,19 @@ function handleSquareMouseUp(event: MouseEvent): void {
         ) {
             if (gs.settings.autoQueen) {
                 move.promotion = PieceType.QUEEN;
+                suppressMoveAnimation(id, move);
                 executeMove(id, move, premove);
             } else {
                 showPromotionDialog(id, selected.piece.color, (pieceType) => {
                     move.promotion = pieceType;
+                    suppressMoveAnimation(id, move);
                     executeMove(id, move, premove);
                 });
             }
             return;
         }
 
+        suppressMoveAnimation(id, move);
         executeMove(id, move, premove);
     } else if (!selected.justSelected && positionsEqual(selected.pos, pos)) {
         deselectPiece();

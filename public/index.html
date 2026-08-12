@@ -147,6 +147,10 @@
 								<span>Sound</span>
 								<select id="menu-setting-sound-theme"></select>
 							</label>
+							<label class="settings-field settings-range-field">
+								<span>Animation speed</span>
+								<input type="range" id="menu-setting-piece-animation-speed" min="0" max="3" step="0.25" />
+							</label>
 							<div class="settings-toggle-grid">
 								<label class="settings-toggle">
 									<input type="checkbox" id="menu-setting-auto-queen" />
@@ -240,6 +244,10 @@
 						<input type="checkbox" id="setting-time-shared" />
 						<span>Shared team clocks</span>
 					</label>
+					<button id="room-variants-btn" class="room-variants-btn" type="button" aria-expanded="false"
+						aria-label="Variants" title="Variants">
+						<span>Variants</span>
+					</button>
 					<button id="more-room-settings-btn" class="room-settings-more-btn" type="button"
 						aria-expanded="false">
 						More settings
@@ -261,6 +269,8 @@
 							<select id="setting-initial-board-mode">
 								<option value="default">Default</option>
 								<option value="960">Chess960</option>
+								<option value="koedem">Koedem</option>
+								<option value="960+koedem">Chess960 + Koedem</option>
 								<option value="custom">Custom FEN</option>
 							</select>
 						</label>
@@ -300,6 +310,16 @@
 				</div>
 			</div>
 			<div id="chat-section">
+				<div id="room-variant-buttons" class="room-variant-buttons hidden" aria-label="Variants">
+					<button class="room-variant-button" type="button" data-initial-board="960" aria-pressed="false"
+						aria-label="Chess960" title="Chess960">
+						<span aria-hidden="true">960</span>
+					</button>
+					<button class="room-variant-button" type="button" data-initial-board="koedem" aria-pressed="false"
+						aria-label="Koedem" title="Koedem">
+						<span aria-hidden="true">Koedem</span>
+					</button>
+				</div>
 				<div id="chat-messages">
 					<div id="chat-message-list"></div>
 					<div id="chat-input-container">

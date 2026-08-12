@@ -152,6 +152,7 @@ export class Settings {
     showLegalMoves = true;
     messageGrouping = false;
     dualBoardUI = true;
+    pieceAnimationSpeed = 1;
 
     constructor() {
         this.load();
@@ -190,6 +191,7 @@ export class Settings {
             showLegalMoves: this.showLegalMoves,
             messageGrouping: this.messageGrouping,
             dualBoardUI: this.dualBoardUI,
+            pieceAnimationSpeed: this.pieceAnimationSpeed,
         };
     }
 
@@ -207,6 +209,16 @@ export class Settings {
             this.soundTheme = "standard";
 
         if (typeof this.dualBoardUI !== "boolean") this.dualBoardUI = true;
+
+        if (
+            typeof this.pieceAnimationSpeed !== "number" ||
+            !Number.isFinite(this.pieceAnimationSpeed)
+        )
+            this.pieceAnimationSpeed = 1;
+        this.pieceAnimationSpeed = Math.min(
+            3,
+            Math.max(0, this.pieceAnimationSpeed),
+        );
     }
 }
 
@@ -224,6 +236,7 @@ interface SettingsData {
     showLegalMoves: boolean;
     messageGrouping: boolean;
     dualBoardUI: boolean;
+    pieceAnimationSpeed: number;
 }
 
 function getCookie(name: string): string | undefined {

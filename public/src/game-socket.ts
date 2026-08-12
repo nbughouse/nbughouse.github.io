@@ -166,6 +166,7 @@ export function initGameSocket(): void {
                     !match.chess.isLegal(
                         match.queued.moves[0],
                         match.queued.color !== match.chess.turn,
+                        gs.room.game.getMoveRules(),
                     )
                 )
                     match.queued.moves.length = 0;
@@ -177,7 +178,11 @@ export function initGameSocket(): void {
 
             if (
                 currentMatch.queued.moves[0] &&
-                currentMatch.chess.isLegal(currentMatch.queued.moves[0])
+                currentMatch.chess.isLegal(
+                    currentMatch.queued.moves[0],
+                    false,
+                    gs.room.game.getMoveRules(),
+                )
             ) {
                 gs.socket.emit(
                     "move-board",

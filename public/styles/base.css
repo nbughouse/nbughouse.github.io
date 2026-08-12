@@ -27,9 +27,6 @@
    --shadow-soft: 0 1.2vh 3vh rgba(0, 0, 0, 0.32);
    --shadow-bottom-size: 0.28vh;
    --shadow-bottom: inset 0 calc(-1 * var(--shadow-bottom-size)) 0 rgba(0, 0, 0, 0.18);
-   --shadow-button: var(--shadow-bottom);
-   --shadow-button-side: 0 var(--shadow-bottom-size) 0 rgba(0, 0, 0, 0.18);
-   --shadow-button-pressed: 0 0 0 rgba(0, 0, 0, 0.18);
 
    --radius-sm: 0.65vh;
    --radius-md: 1vh;
@@ -41,7 +38,6 @@
    --green-dark: #6a9941;
    --yellow: #f0b65a;
    --red: #c94f4f;
-   --red-dark: #a94141;
 
    --green-yellow: color-mix(in lch, var(--green), var(--yellow));
    --yellow-red: color-mix(in lch, var(--yellow), var(--red));
@@ -94,13 +90,6 @@ textarea {
    font: inherit;
 }
 
-.bottom-shadow,
-.control-surface {
-   border: none;
-   outline: none;
-   box-shadow: var(--shadow-bottom);
-}
-
 .open-arrow {
    font-family: "open-arrow", var(--font-family);
    font-weight: normal;
@@ -132,6 +121,7 @@ textarea {
 }
 
 input:not([type="checkbox"]),
+select,
 textarea {
    display: flex;
    outline: none;
@@ -152,11 +142,12 @@ textarea:focus {
    box-shadow: var(--shadow-bottom);
 }
 
-button:not(.button-flat),
-.button-3d {
-   --shadow-button: var(--shadow-button-side);
+:where(button:not(.button-flat), .button-3d) {
+   --button-color: var(--surface-raised);
+   --button-edge: color-mix(in srgb, var(--button-color), black 18%);
 
-   box-shadow: var(--shadow-button);
+   background: var(--button-color);
+   box-shadow: 0 var(--shadow-bottom-size) 0 var(--button-edge);
    transition:
       filter 120ms ease,
       transform 120ms ease,
@@ -164,13 +155,24 @@ button:not(.button-flat),
       box-shadow 120ms ease;
 }
 
-button {
+:where(button, .button-3d) {
    cursor: pointer;
    border: none;
    border-radius: var(--radius-md);
-   padding: 12px 20px;
+}
+
+:is(button, .button-3d) {
    font-weight: var(--font-weight-bold);
+}
+
+button {
+   padding: 12px 20px;
    font-size: 15px;
+}
+
+button:disabled {
+   cursor: not-allowed;
+   opacity: 0.65;
 }
 
 strong,
@@ -183,7 +185,6 @@ b {
 }
 
 :is(button:not(.button-flat), .button-3d):active:not(:disabled) {
-   --shadow-button: var(--shadow-button-pressed);
-
+   box-shadow: none;
    transform: translateY(var(--shadow-bottom-size));
 }

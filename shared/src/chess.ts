@@ -10,6 +10,11 @@ export interface SerializedChess {
     enPassantTarget: BoardPosition | undefined;
 }
 
+export interface MoveRules {
+    allowKingCapture?: boolean;
+    forcePocketKingDrop?: boolean;
+}
+
 export class Chess {
     board: Board = [];
     whitePocket: Map<PieceType, number> = new Map();
@@ -442,8 +447,12 @@ export class Chess {
         }
     }
 
-    getLegalMoveType(move: Move, premove = false): MoveType {
-        if (!this.isLegal(move, premove)) return MoveType.ILLEGAL;
+    getLegalMoveType(
+        move: Move,
+        premove = false,
+        rules: MoveRules = {},
+    ): MoveType {
+        if (!this.isLegal(move, premove, rules)) return MoveType.ILLEGAL;
 
         if (premove) return MoveType.PREMOVE;
         if (move.to.loc === "pocket") return MoveType.NORMAL;
@@ -478,15 +487,22 @@ export class Chess {
         from: BoardPosition,
         to: BoardPosition,
         premove: boolean = false,
+        rules: MoveRules = {},
     ): boolean {
         const piece = this.board[from.row][from.col];
         if (!piece) return false;
+
+        const targetPiece = this.board[to.row][to.col];
+        if (
+            targetPiece?.type === PieceType.KING &&
+            !rules.allowKingCapture
+        )
+            return false;
 
         // In premove mode, skip turn and friendly fire checks
         if (!premove) {
             if (this.turn !== piece.color) return false;
 
-            const targetPiece = this.board[to.row][to.col];
             if (targetPiece && targetPiece.color === piece.color) return false;
         }
 
@@ -496,6 +512,7 @@ export class Chess {
 
         // In premove mode, skip check validation
         if (premove) return true;
+        if (rules.allowKingCapture) return true;
 
         // Simulate the move to check if it leaves the king in check
         const originalPiece = this.board[to.row][to.col];
@@ -531,6 +548,7 @@ export class Chess {
         from: PocketPosition,
         to: BoardPosition,
         premove: boolean = false,
+        rules: MoveRules = {},
     ): boolean {
         // Check if piece is in pocket
         const pocket = this.getPocket(from.color);
@@ -546,6 +564,7 @@ export class Chess {
         if (this.turn !== from.color) return false;
 
         if (this.board[to.row][to.col]) return false;
+        if (rules.allowKingCapture) return true;
 
         this.board[to.row][to.col] = { type: from.type, color: from.color };
 
@@ -556,11 +575,23 @@ export class Chess {
         return !inCheck;
     }
 
-    isLegal(move: Move, premove = false): boolean {
+    isLegal(move: Move, premove = false, rules: MoveRules = {}): boolean {
         if (move.to.loc === "pocket") return true;
+        if (
+            !premove &&
+            rules.forcePocketKingDrop &&
+            this.getPocket(this.turn).has(PieceType.KING) &&
+            !(
+                move.from.loc === "pocket" &&
+                move.from.color === this.turn &&
+                move.from.type === PieceType.KING
+            )
+        )
+            return false;
+
         return move.from.loc === "pocket"
-            ? this.isLegalDrop(move.from, move.to, premove)
-            : this.isLegalMove(move.from, move.to, premove);
+            ? this.isLegalDrop(move.from, move.to, premove, rules)
+            : this.isLegalMove(move.from, move.to, premove, rules);
     }
 
     doMove(move: Move, premove = false): MoveResult {

@@ -1,6 +1,6 @@
 import { Chat } from "./chat";
-import type { Move, MoveResult, SerializedChess } from "./chess";
-import { Chess, Color } from "./chess";
+import type { Move, MoveResult, MoveRules, SerializedChess } from "./chess";
+import { Chess, Color, PieceType } from "./chess";
 import { GameConfig } from "./config";
 import { Player, PlayerStatus } from "./player";
 
@@ -194,6 +194,10 @@ export class Room {
                 player.total++;
             }
         }
+
+        for (const player of this.players.values())
+            if (player.status === PlayerStatus.SPECTATING)
+                this.removePlayerFromBoards(player.id);
 
         for (const [id, player] of this.players)
             if (player.status === PlayerStatus.DISCONNECTED)
@@ -396,6 +400,17 @@ export class Game {
         this.moveResultEffects(matchIndex, move, result);
     }
 
+    getMoveRules(): MoveRules {
+        const koedem = hasInitialBoardVariant(
+            this.config.initialBoard,
+            "koedem",
+        );
+        return {
+            allowKingCapture: koedem,
+            forcePocketKingDrop: koedem,
+        };
+    }
+
     private moveResultEffects(
         matchID: number,
         move: Move,
@@ -487,6 +502,38 @@ export class Game {
             : { team: minSide, player: minPlayer };
     }
 
+    checkKingAccumulation(): Team | undefined {
+        if (!hasInitialBoardVariant(this.config.initialBoard, "koedem"))
+            return undefined;
+
+        const kingCounts = new Map<Team, number>([
+            [Team.BLUE, 0],
+            [Team.RED, 0],
+        ]);
+
+        for (const match of this.matches) {
+            for (const row of match.chess.board) {
+                for (const piece of row) {
+                    if (piece?.type !== PieceType.KING) continue;
+                    const team = match.getTeam(piece.color);
+                    kingCounts.set(team, (kingCounts.get(team) ?? 0) + 1);
+                }
+            }
+
+            for (const color of [Color.WHITE, Color.BLACK]) {
+                const pocketKings =
+                    match.chess.getPocket(color).get(PieceType.KING) ?? 0;
+                if (pocketKings <= 0) continue;
+                const team = match.getTeam(color);
+                kingCounts.set(team, (kingCounts.get(team) ?? 0) + pocketKings);
+            }
+        }
+
+        if ((kingCounts.get(Team.BLUE) ?? 0) >= 4) return Team.BLUE;
+        if ((kingCounts.get(Team.RED) ?? 0) >= 4) return Team.RED;
+        return undefined;
+    }
+
     private getLowestTimePlayer(team: Team): Player | undefined {
         let lowestTime = Infinity;
         let lowestTimePlayer: Player | undefined;
@@ -526,8 +573,22 @@ function resetMatchChess(
     match: Match,
     initialBoard: GameConfig["initialBoard"],
 ): void {
-    void initialBoard;
+    if (
+        initialBoard === "random" ||
+        hasInitialBoardVariant(initialBoard, "960")
+    ) {
+        match.chess.resetRandom();
+        return;
+    }
+
     match.chess.reset();
+}
+
+function hasInitialBoardVariant(
+    initialBoard: GameConfig["initialBoard"],
+    variant: string,
+): boolean {
+    return initialBoard.split("+").includes(variant);
 }
 
 /**

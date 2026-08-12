@@ -133,9 +133,6 @@
 #back-from-help-btn,
 #back-from-settings-btn {
    position: relative;
-   box-shadow: var(--shadow-button);
-   border-radius: var(--radius-md);
-   background: var(--surface-raised);
    padding: 0;
    width: 42px;
    height: 42px;
@@ -176,6 +173,11 @@
 .menu-settings-form .settings-picker-button {
    height: 38px;
    font-size: 15px;
+}
+
+.menu-settings-form .settings-range-field input[type="range"] {
+   padding: 0;
+   accent-color: var(--blue);
 }
 
 .menu-settings-form .settings-picker-menu {
@@ -232,21 +234,15 @@
 }
 
 .game-action-btn {
+   --button-color: var(--green);
+
    height: var(--menu-control-height);
    font-size: 22px;
 }
 
-.game-action-btn {
-   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--green-dark);
-
-   background: var(--green);
-}
-
 #join-game-btn,
 .secondary-action {
-   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--red-dark);
-
-   background: var(--red);
+   --button-color: var(--red);
 }
 
 .form-group {
@@ -260,11 +256,9 @@
    justify-content: center;
    align-items: center;
    height: var(--menu-compact-button-height);
-   background: var(--surface);
+   --button-color: var(--surface);
    padding: 0;
-   border-radius: var(--radius-md);
    text-decoration: none;
-   box-shadow: var(--shadow-button);
 }
 
 .util-btns svg,
@@ -337,14 +331,10 @@
    display: flex;
    justify-content: center;
    align-items: center;
-   border-radius: var(--radius-md);
-   background: var(--surface-raised);
    min-height: 46px;
    padding: 12px 16px;
    color: var(--text);
-   font-weight: var(--font-weight-bold);
    text-decoration: none;
-   box-shadow: var(--shadow-button);
 }
 
 #menu-error {
