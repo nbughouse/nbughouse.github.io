@@ -276,20 +276,29 @@ export function updateUITime(): void {
         const matchInstance = getMatchInstance(index);
 
         const isFlipped = getBoardFlipState(index);
+        const whiteTime = getDisplayedTime(matchInstance, Color.WHITE);
+        const blackTime = getDisplayedTime(matchInstance, Color.BLACK);
 
         updateTimeDisplay(
             index,
             "top",
-            isFlipped ? matchInstance.whiteTime : matchInstance.blackTime,
+            isFlipped ? whiteTime : blackTime,
             isFlipped ? Color.WHITE : Color.BLACK,
         );
         updateTimeDisplay(
             index,
             "bottom",
-            isFlipped ? matchInstance.blackTime : matchInstance.whiteTime,
+            isFlipped ? blackTime : whiteTime,
             isFlipped ? Color.BLACK : Color.WHITE,
         );
     }
+}
+
+function getDisplayedTime(match: Match, color: Color): number {
+    if (!gs.room.game.config.timeShared)
+        return color === Color.WHITE ? match.whiteTime : match.blackTime;
+
+    return gs.room.game.getTeamTime(match.getTeam(color));
 }
 
 function updateTimeDisplay(
@@ -339,6 +348,10 @@ function getOtherTeamMinimumTime(
 ): number | undefined {
     const match = getMatchInstance(boardID);
     const otherTeam = match.getTeam(color) === Team.RED ? Team.BLUE : Team.RED;
+
+    if (gs.room.game.config.timeShared)
+        return gs.room.game.getTeamTime(otherTeam);
+
     let minimum: number | undefined;
 
     for (let index = 0; index < gs.room.game.matches.length; index++) {

@@ -438,32 +438,75 @@ export class Game {
         for (const match of this.matches) match.updateTime(currentTime);
     }
 
+    getTeamTime(team: Team): number {
+        let total = 0;
+
+        for (const match of this.matches) {
+            const color =
+                (team === Team.BLUE) === match.flipped
+                    ? Color.WHITE
+                    : Color.BLACK;
+            total += color === Color.WHITE ? match.whiteTime : match.blackTime;
+        }
+
+        return total;
+    }
+
     checkTimeout(): { team: Team; player: Player } | undefined {
+        if (this.config.timeShared) {
+            const blueTime = this.getTeamTime(Team.BLUE);
+            const redTime = this.getTeamTime(Team.RED);
+
+            if (blueTime > 0 && redTime > 0) return;
+
+            const team = blueTime <= redTime ? Team.BLUE : Team.RED;
+            const player = this.getLowestTimePlayer(team);
+            return player ? { team, player } : undefined;
+        }
+
         let minTime = Infinity;
         let minSide: Team | undefined;
         let minPlayer: Player | undefined;
 
         for (const match of this.matches) {
-            if ((match.flipped ? match.blackTime : match.whiteTime) < minTime) {
-                minTime = match.flipped ? match.blackTime : match.whiteTime;
-                minSide = Team.BLUE;
-                minPlayer = match.flipped
-                    ? match.blackPlayer
-                    : match.whitePlayer;
+            if (match.whiteTime < minTime) {
+                minTime = match.whiteTime;
+                minSide = match.getTeam(Color.WHITE);
+                minPlayer = match.whitePlayer;
             }
 
-            if ((match.flipped ? match.whiteTime : match.blackTime) < minTime) {
-                minTime = match.flipped ? match.whiteTime : match.blackTime;
-                minSide = Team.RED;
-                minPlayer = match.flipped
-                    ? match.whitePlayer
-                    : match.blackPlayer;
+            if (match.blackTime < minTime) {
+                minTime = match.blackTime;
+                minSide = match.getTeam(Color.BLACK);
+                minPlayer = match.blackPlayer;
             }
         }
 
         return minTime > 0 || !minSide || !minPlayer
             ? undefined
             : { team: minSide, player: minPlayer };
+    }
+
+    private getLowestTimePlayer(team: Team): Player | undefined {
+        let lowestTime = Infinity;
+        let lowestTimePlayer: Player | undefined;
+
+        for (const match of this.matches) {
+            const color =
+                (team === Team.BLUE) === match.flipped
+                    ? Color.WHITE
+                    : Color.BLACK;
+            const time =
+                color === Color.WHITE ? match.whiteTime : match.blackTime;
+            const player = match.getPlayer(color);
+
+            if (player && time < lowestTime) {
+                lowestTime = time;
+                lowestTimePlayer = player;
+            }
+        }
+
+        return lowestTimePlayer;
     }
 }
 
