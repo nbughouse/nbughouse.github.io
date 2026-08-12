@@ -1,6 +1,6 @@
 import { Color, type Move } from "@shared/chess";
 import type { GameConfig } from "@shared/config";
-import { getPlayerDisplayName, PlayerStatus } from "@shared/player";
+import { getPlayerDisplayName, Player, PlayerStatus } from "@shared/player";
 import { Room, RoomStatus, Team } from "@shared/room";
 import type { GameSocket } from "./index";
 import { io, profiles, rooms } from "./index";
@@ -19,8 +19,16 @@ export function setupHandlers(socket: GameSocket): void {
         const profile = profiles.get(socket.player.id);
         if (profile) profile.name = trimmedName;
 
-        const roomPlayer = socket.room?.players.get(socket.player.id);
-        if (roomPlayer) roomPlayer.name = trimmedName;
+        const room = socket.room;
+        const roomPlayer = room?.players.get(socket.player.id);
+        if (room && roomPlayer) {
+            roomPlayer.name = trimmedName;
+            io.to(room.code).emit(
+                "p-set-name",
+                socket.player.id,
+                trimmedName,
+            );
+        }
     });
 
     socket.on("create-room", () => {
@@ -76,12 +84,36 @@ export function setupHandlers(socket: GameSocket): void {
         if (!socket.room) return;
 
         const trimmedMessage = message.trim().slice(0, 200);
-        socket.room.chat.push(socket.player.id, trimmedMessage);
-        io.to(socket.room.code).emit(
-            "p-sent-chat",
-            socket.player.id,
-            trimmedMessage,
-        );
+        if (!trimmedMessage) return;
+
+        const allChatPrefix = "/a ";
+        const isAllChatOverride = trimmedMessage.startsWith(allChatPrefix);
+        const outgoingMessage = isAllChatOverride
+            ? trimmedMessage.slice(allChatPrefix.length).trim()
+            : trimmedMessage;
+        if (!outgoingMessage) return;
+
+        const player = socket.room.getPlayer(socket.player.id);
+        const team =
+            player?.status === PlayerStatus.SPECTATING
+                ? undefined
+                : getPlayerTeam(socket);
+        const sendToAll =
+            socket.room.status !== RoomStatus.PLAYING ||
+            isAllChatOverride ||
+            !team;
+
+        if (sendToAll) {
+            socket.room.chat.push(socket.player.id, outgoingMessage);
+            io.to(socket.room.code).emit(
+                "p-sent-chat",
+                socket.player.id,
+                outgoingMessage,
+            );
+            return;
+        }
+
+        emitTeamChat(socket.room, team, socket.player.id, outgoingMessage);
     });
 
     socket.on("join-board", (boardID: number, color: Color) => {
@@ -213,12 +245,31 @@ export function setupHandlers(socket: GameSocket): void {
 function getPlayerTeam(socket: GameSocket): Team | undefined {
     if (!socket.room) return;
 
-    for (const match of socket.room.game.matches) {
-        if (match.getPlayerTeam(Team.BLUE)?.id === socket.player.id)
+    return getPlayerTeamInRoom(socket.room, socket.player.id);
+}
+
+function getPlayerTeamInRoom(room: Room, playerID: string): Team | undefined {
+    for (const match of room.game.matches) {
+        if (match.getPlayerTeam(Team.BLUE)?.id === playerID)
             return Team.BLUE;
 
-        if (match.getPlayerTeam(Team.RED)?.id === socket.player.id)
+        if (match.getPlayerTeam(Team.RED)?.id === playerID)
             return Team.RED;
+    }
+}
+
+function emitTeamChat(
+    room: Room,
+    team: Team,
+    playerID: string,
+    message: string,
+): void {
+    for (const connectedSocket of io.sockets.sockets.values()) {
+        const recipient = connectedSocket as GameSocket;
+        if (recipient.room?.code !== room.code) continue;
+        if (getPlayerTeamInRoom(room, recipient.player.id) !== team) continue;
+
+        recipient.emit("p-sent-chat", playerID, message);
     }
 }
 
@@ -259,10 +310,16 @@ function joinRoom(socket: GameSocket, code: string): void {
         socket.emit("joined-room", room.serialize());
         socket
             .to(room.code)
+            .emit("p-set-name", socket.player.id, socket.player.name);
+        socket
+            .to(room.code)
             .emit("p-set-status", socket.player.id, PlayerStatus.CONNECTED);
     } else {
-        const roomPlayer = socket.player.clone();
-        roomPlayer.status = PlayerStatus.CONNECTED;
+        const roomPlayer = new Player(
+            socket.player.id,
+            socket.player.name,
+            PlayerStatus.CONNECTED,
+        );
         room.addPlayer(roomPlayer);
         io.to(room.code).emit(
             "p-joined-room",
@@ -304,10 +361,8 @@ function handlePlayerLeave(socket: GameSocket): void {
 function handleLobbyPlayerLeave(socket: GameSocket, room: Room): void {
     const vacatedSeats = getPlayerSeats(room, socket.player.id);
 
-    room.disconnectPlayer(socket.player.id);
-    socket
-        .to(room.code)
-        .emit("p-set-status", socket.player.id, PlayerStatus.DISCONNECTED);
+    room.removePlayer(socket.player.id);
+    socket.to(room.code).emit("p-left-room", socket.player.id);
 
     for (const { boardID, color } of vacatedSeats)
         socket.to(room.code).emit("p-left-board", boardID, color);
@@ -319,6 +374,13 @@ function handleGamePlayerDisconnect(socket: GameSocket, room: Room): void {
     const player = room.players.get(socket.player.id);
     if (!player) return;
 
+    if (getPlayerSeats(room, socket.player.id).length === 0) {
+        room.removePlayer(socket.player.id);
+        socket.to(room.code).emit("p-left-room", socket.player.id);
+        socket.to(room.code).emit("room-host-updated", room.hostID);
+        return;
+    }
+
     player.status = PlayerStatus.DISCONNECTED;
     socket
         .to(room.code)
@@ -326,7 +388,7 @@ function handleGamePlayerDisconnect(socket: GameSocket, room: Room): void {
 }
 
 function shouldDeleteRoom(room: Room): boolean {
-    return room.allPlayersDisconnected();
+    return room.status === RoomStatus.LOBBY && room.players.size === 0;
 }
 
 function deleteRoom(roomCode: string): void {

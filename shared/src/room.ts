@@ -122,16 +122,6 @@ export class Room {
         this.players.set(player.id, player);
     }
 
-    disconnectPlayer(id: string): void {
-        const player = this.players.get(id);
-        if (!player) return;
-
-        player.status = PlayerStatus.DISCONNECTED;
-        this.removePlayerFromBoards(id);
-
-        if (this.hostID === id) this.hostID = this.nextConnectedPlayerID();
-    }
-
     removePlayer(id: string): void {
         this.players.delete(id);
         this.removePlayerFromBoards(id);
@@ -155,14 +145,6 @@ export class Room {
 
     getPlayer(id: string): Player | undefined {
         return this.players.get(id);
-    }
-
-    allPlayersDisconnected(): boolean {
-        if (this.players.size === 0) return true;
-        for (const player of this.players.values())
-            if (player.status !== PlayerStatus.DISCONNECTED) return false;
-
-        return true;
     }
 
     tryStartRoom(currentTime: number = Date.now()): boolean {
@@ -213,9 +195,9 @@ export class Room {
             }
         }
 
-        for (const player of this.players.values())
+        for (const [id, player] of this.players)
             if (player.status === PlayerStatus.DISCONNECTED)
-                this.removePlayerFromBoards(player.id);
+                this.removePlayer(id);
     }
 
     updateConfig(config: Partial<GameConfig>): boolean {

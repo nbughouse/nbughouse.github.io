@@ -148,7 +148,7 @@ export class Settings {
     highlightLastMove = true;
     movementMode: MovementMode = "both";
     sounds = true;
-    soundTheme: SoundTheme = "sfx";
+    soundTheme: SoundTheme = "standard";
     showLegalMoves = true;
 
     constructor() {
@@ -200,7 +200,7 @@ export class Settings {
             this.movementMode = "both";
 
         if (!soundThemes.some((theme) => theme.id === this.soundTheme))
-            this.soundTheme = "sfx";
+            this.soundTheme = "standard";
     }
 }
 

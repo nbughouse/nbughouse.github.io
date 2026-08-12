@@ -1,5 +1,9 @@
 import { Color } from "@shared/chess";
-import { getPlayerDisplayName, type Player } from "@shared/player";
+import {
+    getPlayerDisplayName,
+    type Player,
+    PlayerStatus,
+} from "@shared/player";
 import type { Match } from "@shared/room";
 import { RoomStatus, Team } from "@shared/room";
 import {
@@ -8,9 +12,28 @@ import {
     updateUIChess,
 } from "./chess-ui";
 import { gs } from "./session";
+import { getAssetPath } from "./app-paths";
 
 export let visualFlipped: boolean = false;
 let intervalID: number;
+let latestWinningPlayerIds = new Set<string>();
+
+export function rememberLatestWinners(team: Team): void {
+    latestWinningPlayerIds = new Set();
+
+    for (const match of gs.room.game.matches) {
+        const player = match.getPlayerTeam(team);
+        if (player) latestWinningPlayerIds.add(player.id);
+    }
+}
+
+export function clearLatestWinners(): void {
+    latestWinningPlayerIds = new Set();
+}
+
+export function isLatestWinner(playerID: string): boolean {
+    return latestWinningPlayerIds.has(playerID);
+}
 
 // Visual Flip Control
 export function setVisualFlipped(flipped: boolean): void {
@@ -52,11 +75,7 @@ function formatTime(time: number): string {
 
 function formatTimeDifference(time: number): string {
     const sign = time >= 0 ? "+" : "-";
-    const milliseconds = Math.abs(time);
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${sign}${minutes}:${seconds.toString().padStart(2, "0")}`;
+    return `${sign}${formatTime(Math.abs(time))}`;
 }
 
 function createPocketRowElements(
@@ -88,6 +107,14 @@ function createPocketRowElements(
     name.className = "player-name-plaque";
     name.id = `${side}-name-${boardID}`;
     name.hidden = true;
+
+    const badges = document.createElement("span");
+    badges.className = "player-plaque-badges";
+
+    const nameText = document.createElement("span");
+    nameText.className = "player-plaque-name";
+
+    name.append(badges, nameText);
 
     pocketArea.append(pocket);
     row.append(pocketArea, info, name);
@@ -210,7 +237,36 @@ function updatePlayerName(
     if (!name) return;
 
     name.hidden = !player;
-    name.textContent = player ? getPlayerDisplayName(player) : "";
+    const nameText = name.querySelector(".player-plaque-name");
+    const badges = name.querySelector(".player-plaque-badges");
+    if (!nameText || !badges) return;
+
+    nameText.textContent = player ? getPlayerDisplayName(player) : "";
+    badges.replaceChildren();
+
+    if (player && isLatestWinner(player.id)) {
+        const crown = document.createElement("img");
+        crown.className = "player-plaque-badge player-plaque-crown";
+        crown.src = getAssetPath("img/crown.svg");
+        crown.alt = "Winner";
+        crown.title = "Winner";
+        badges.append(crown);
+    }
+
+    if (player?.status === PlayerStatus.DISCONNECTED) {
+        const disconnected = document.createElement("span");
+        disconnected.className =
+            "player-plaque-badge player-plaque-disconnected";
+        disconnected.setAttribute("role", "img");
+        disconnected.setAttribute("aria-label", "Disconnected");
+        disconnected.title = "Disconnected";
+        disconnected.style.setProperty(
+            "--player-plaque-disconnected-icon",
+            `url("${getAssetPath("img/disconnected.svg")}")`,
+        );
+        badges.append(disconnected);
+    }
+
     name.style.color = "var(--text)";
 }
 

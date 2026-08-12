@@ -46,7 +46,7 @@
 
 #menu-shell.settings-mode {
    width: 100%;
-   overflow: hidden;
+   overflow: visible;
 }
 
 #menu-header {
@@ -190,6 +190,7 @@
 .menu-settings-form .settings-toggle {
    padding: 9px;
    font-size: 13px;
+   box-shadow: none;
 }
 
 #join-form,
@@ -236,11 +237,15 @@
 }
 
 .game-action-btn {
+   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--green-dark);
+
    background: var(--green);
 }
 
 #join-game-btn,
 .secondary-action {
+   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--red-dark);
+
    background: var(--red);
 }
 
@@ -340,18 +345,6 @@
    font-weight: var(--font-weight-bold);
    text-decoration: none;
    box-shadow: var(--shadow-button);
-   transition:
-      filter 120ms ease,
-      transform 120ms ease;
-}
-
-#github-link:hover {
-   filter: brightness(1.06);
-}
-
-#github-link:active {
-   transform: translateY(0.12vh);
-   box-shadow: var(--shadow-bottom-active);
 }
 
 #menu-error {

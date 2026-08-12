@@ -9,7 +9,6 @@ import {
 } from "@shared/room";
 import {
     endGameUI,
-    rememberLatestWinners,
     rebuildRoomBoardElements,
     showRoomElements,
     startGameUI,
@@ -23,6 +22,7 @@ import { clearLastMoves, rememberLastMove } from "./chess-ui";
 import {
     startTimeUpdates,
     stopTimeUpdates,
+    rememberLatestWinners,
     updateUIAllBoards,
     updateUIAllPlayers,
     updateUIPlayers,
@@ -73,6 +73,17 @@ export function initGameSocket(): void {
         updateUIPlayerList();
     });
 
+    gs.socket.on("p-set-name", (id: string, name: string) => {
+        const player = gs.room.getPlayer(id);
+        if (!player) return;
+
+        player.name = name;
+        if (id === gs.player.id) gs.player.name = name;
+        updateUIPlayerList();
+        updateUIAllPlayers();
+        updateUIAllChat();
+    });
+
     gs.socket.on(
         "p-joined-board",
         (id: string, boardID: number, color: Color) => {
@@ -97,12 +108,17 @@ export function initGameSocket(): void {
 
         player.status = status;
         updateUIPlayerList();
+        updateUIAllPlayers();
         updateStartButton();
     });
 
     gs.socket.on("room-settings-updated", (raw: SerializedGame) => {
         gs.room.setGame(raw);
-        rebuildRoomBoardElements();
+        const renderedBoardCount = document.querySelectorAll(
+            "#game-area .match-container",
+        ).length;
+        if (renderedBoardCount !== gs.room.game.matches.length)
+            rebuildRoomBoardElements();
         updateUIAllBoards();
         updateUIAllPlayers();
         updateUITime();

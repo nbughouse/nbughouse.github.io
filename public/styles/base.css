@@ -25,9 +25,11 @@
    --text-secondary: var(--hidden-text);
    --border-soft: rgba(255, 255, 255, 0.08);
    --shadow-soft: 0 1.2vh 3vh rgba(0, 0, 0, 0.32);
-   --shadow-bottom: inset 0 -0.28vh 0 rgba(0, 0, 0, 0.18);
-   --shadow-bottom-active: inset 0 -0.12vh 0 rgba(0, 0, 0, 0.18);
+   --shadow-bottom-size: 0.28vh;
+   --shadow-bottom: inset 0 calc(-1 * var(--shadow-bottom-size)) 0 rgba(0, 0, 0, 0.18);
    --shadow-button: var(--shadow-bottom);
+   --shadow-button-side: 0 var(--shadow-bottom-size) 0 rgba(0, 0, 0, 0.18);
+   --shadow-button-pressed: 0 0 0 rgba(0, 0, 0, 0.18);
 
    --radius-sm: 0.65vh;
    --radius-md: 1vh;
@@ -52,6 +54,12 @@
    margin: 0;
    padding: 0;
    color: var(--text);
+}
+
+img,
+svg {
+   -webkit-user-drag: none;
+   user-select: none;
 }
 
 ::placeholder {
@@ -144,18 +152,25 @@ textarea:focus {
    box-shadow: var(--shadow-bottom);
 }
 
+button:not(.button-flat),
+.button-3d {
+   --shadow-button: var(--shadow-button-side);
+
+   box-shadow: var(--shadow-button);
+   transition:
+      filter 120ms ease,
+      transform 120ms ease,
+      background 120ms ease,
+      box-shadow 120ms ease;
+}
+
 button {
    cursor: pointer;
    border: none;
    border-radius: var(--radius-md);
    padding: 12px 20px;
-   box-shadow: var(--shadow-button);
    font-weight: var(--font-weight-bold);
    font-size: 15px;
-   transition:
-      filter 120ms ease,
-      transform 120ms ease,
-      background 120ms ease;
 }
 
 strong,
@@ -163,11 +178,12 @@ b {
    font-weight: var(--font-weight-bold);
 }
 
-button:hover:not(:disabled) {
+:is(button:not(.button-flat), .button-3d):hover:not(:disabled) {
    filter: brightness(1.06);
 }
 
-button:active:not(:disabled) {
-   transform: translateY(0.12vh);
-   box-shadow: var(--shadow-bottom-active);
+:is(button:not(.button-flat), .button-3d):active:not(:disabled) {
+   --shadow-button: var(--shadow-button-pressed);
+
+   transform: translateY(var(--shadow-bottom-size));
 }

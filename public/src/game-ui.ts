@@ -10,7 +10,9 @@ import type {
 import { getPlayerDisplayName, PlayerStatus } from "@shared/player";
 import { RoomStatus, type Team } from "@shared/room";
 import {
+    clearLatestWinners,
     createMatchElements,
+    isLatestWinner,
     setVisualFlipped,
     toggleVisualFlipped,
     updateUIAllGame,
@@ -22,15 +24,16 @@ import { soundThemes, type SoundName } from "./settings";
 import { createSettingsSelect, syncHoverPreviewSelect } from "./settings-ui";
 
 let gridMode = false;
+let gridLayoutObserver: ResizeObserver | undefined;
 
 let pingIntervalID: number;
 let pingStartTime: number = 0;
 let roomSettingsSaveTimeout: number | undefined;
 const roomSettingsSaveDelay = 300;
-let latestWinningPlayerIds = new Set<string>();
 
 export function initGameControls(): void {
     initSidebarTabs();
+    initGridLayoutObserver();
 
     const leaveGameButton = document.querySelector("#leave-game-btn");
     leaveGameButton?.addEventListener("click", () => {
@@ -133,9 +136,12 @@ function initSidebarTabs(): void {
 
     const timeBonusInput = document.querySelector("#setting-time-bonus");
     const timeSharedInput = document.querySelector("#setting-time-shared");
+    const initialBoardModeSelect = document.querySelector(
+        "#setting-initial-board-mode",
+    ) as HTMLSelectElement | null;
     const initialBoardFenInput = document.querySelector(
         "#setting-initial-board-fen",
-    );
+    ) as HTMLInputElement | null;
     for (const selector of [
         "#setting-match-num",
         "#setting-time-base",
@@ -168,6 +174,12 @@ function initSidebarTabs(): void {
     timeBonusInput?.addEventListener("keydown", stopSidebarInputShortcut);
     timeSharedInput?.addEventListener("keydown", stopSidebarInputShortcut);
     initialBoardFenInput?.addEventListener("keydown", stopSidebarInputShortcut);
+    initialBoardModeSelect?.addEventListener("change", () => {
+        syncInitialBoardFenVisibility(
+            initialBoardModeSelect,
+            initialBoardFenInput,
+        );
+    });
 
     createSettingsSelect(
         document.querySelector("#setting-player-assignment") as HTMLSelectElement,
@@ -186,13 +198,14 @@ function initSidebarTabs(): void {
     );
 
     createSettingsSelect(
-        document.querySelector("#setting-initial-board-mode") as HTMLSelectElement,
+        initialBoardModeSelect,
         [
             { value: "default", label: "Default" },
             { value: "960", label: "Chess960" },
             { value: "custom", label: "Custom FEN" },
         ],
     );
+    syncInitialBoardFenVisibility(initialBoardModeSelect, initialBoardFenInput);
 
     createSettingsSelect(
         document.querySelector("#setting-drop-aggression") as HTMLSelectElement,
@@ -334,8 +347,7 @@ function getInitialBoardSetting(
 // MARK: Resign Functionality
 
 function handleResign(): void {
-    if (confirm("Are you sure you want to resign? This will end the game."))
-        gs.socket.emit("resign-room");
+    gs.socket.emit("resign-room");
 }
 
 function isPlayerInGame(): boolean {
@@ -365,11 +377,16 @@ function initPingIndicator(): void {
 }
 
 function updatePingDisplay(ping: number): void {
+    const pingIndicator = document.querySelector("#ping-indicator") as HTMLElement;
+    const pingLabel = `Ping: ${Math.round(ping)} ms`;
+    pingIndicator.title = pingLabel;
+    pingIndicator.setAttribute("aria-label", pingLabel);
+
     const ranges = [
-        { max: 50, bars: 5, color: "var(--green)" },
-        { max: 100, bars: 4, color: "var(--green-yellow)" },
-        { max: 150, bars: 3, color: "var(--yellow)" },
-        { max: 250, bars: 2, color: "var(--yellow-red)" },
+        { max: 50, bars: 4, color: "var(--green)" },
+        { max: 100, bars: 3, color: "var(--green-yellow)" },
+        { max: 150, bars: 2, color: "var(--yellow)" },
+        { max: 250, bars: 1, color: "var(--yellow-red)" },
         { max: Infinity, bars: 1, color: "var(--red)" },
     ];
 
@@ -615,11 +632,23 @@ function setInitialBoardUI(
     ) {
         modeSelect.value = initialBoard === "random" ? "960" : initialBoard;
         fenInput.value = "";
+        syncInitialBoardFenVisibility(modeSelect, fenInput);
         return;
     }
 
     modeSelect.value = "custom";
     fenInput.value = initialBoard;
+    syncInitialBoardFenVisibility(modeSelect, fenInput);
+}
+
+function syncInitialBoardFenVisibility(
+    modeSelect: HTMLSelectElement | null,
+    fenInput: HTMLInputElement | null,
+): void {
+    fenInput?.closest(".settings-field")?.classList.toggle(
+        "hidden",
+        modeSelect?.value !== "custom",
+    );
 }
 
 function canEditRoomSettings(): boolean {
@@ -681,11 +710,12 @@ function resetGameButtons(): void {
     const lobbyActionRow = document.querySelector(
         "#lobby-action-row",
     ) as HTMLElement;
+
+    lobbyActionRow.style.display = "flex";
     const resignButton = document.querySelector(
         "#resign-btn",
     ) as HTMLButtonElement;
 
-    lobbyActionRow.style.display = "flex";
     resignButton.style.display = "none";
     updateStartButton();
 }
@@ -716,7 +746,7 @@ export function updateUIPlayerList(): void {
             if (isCurrentPlayer)
                 nameDiv.style.fontWeight = "var(--font-weight-bold)";
             statsDiv.className = "player-stats";
-            if (latestWinningPlayerIds.has(id)) {
+            if (isLatestWinner(id)) {
                 const crown = document.createElement("img");
                 crown.className = "winner-crown";
                 crown.src = getAssetPath("img/crown.svg");
@@ -734,6 +764,12 @@ export function updateUIPlayerList(): void {
                 spectatingIcon.setAttribute("aria-hidden", "true");
                 playerDiv.append(spectatingIcon);
             }
+            if (player.status === PlayerStatus.DISCONNECTED) {
+                const disconnectedIcon = document.createElement("span");
+                disconnectedIcon.className = "disconnected-icon";
+                disconnectedIcon.setAttribute("aria-hidden", "true");
+                playerDiv.append(disconnectedIcon);
+            }
             playerDiv.append(nameDiv);
             playerDiv.append(statsDiv);
             playerList.append(playerDiv);
@@ -742,32 +778,20 @@ export function updateUIPlayerList(): void {
     updateStartButton();
 }
 
-export function rememberLatestWinners(team: Team): void {
-    latestWinningPlayerIds = new Set();
-
-    for (const match of gs.room.game.matches) {
-        const player = match.getPlayerTeam(team);
-        if (player) latestWinningPlayerIds.add(player.id);
-    }
-}
-
-function clearLatestWinners(): void {
-    latestWinningPlayerIds = new Set();
-}
-
 // MARK: Chat UI
 
 export function updateUIAllChat(): void {
-    const chatMessagesDiv = document.querySelector("#chat-messages");
-    if (!chatMessagesDiv) return;
+    const chatMessageList = document.querySelector("#chat-message-list");
+    if (!chatMessageList) return;
 
-    chatMessagesDiv.innerHTML = "";
+    chatMessageList.innerHTML = "";
     for (const message of gs.room.chat.messages) updateUIPushChat(message);
 }
 
 export function updateUIPushChat(message: ChatMessage): void {
     const chatMessagesDiv = document.querySelector("#chat-messages");
-    if (!chatMessagesDiv) return;
+    const chatMessageList = document.querySelector("#chat-message-list");
+    if (!chatMessagesDiv || !chatMessageList) return;
 
     const getSenderName = () => {
         if (message.id === gs.player.id) return "You";
@@ -782,7 +806,7 @@ export function updateUIPushChat(message: ChatMessage): void {
     } ${message.id === "server" ? "server" : ""}`.trim();
 
     const senderName = getSenderName();
-    const previousMessage = chatMessagesDiv.lastElementChild as HTMLElement | null;
+    const previousMessage = chatMessageList.lastElementChild as HTMLElement | null;
 
     if (previousMessage?.dataset.senderId === message.id) {
         const text = previousMessage.querySelector(".chat-text");
@@ -805,7 +829,7 @@ export function updateUIPushChat(message: ChatMessage): void {
     textDiv.textContent = message.message;
 
     messageDiv.append(senderDiv, textDiv);
-    chatMessagesDiv.append(messageDiv);
+    chatMessageList.append(messageDiv);
     chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
 }
 
@@ -971,10 +995,9 @@ function setGridMode(enabled: boolean, forceLayout = false): void {
             <rect x="3" y="14" width="7" height="7"></rect>
             <rect x="14" y="14" width="7" height="7"></rect>
          </svg>
-      `;
+        `;
 
         updateGridLayout();
-        window.addEventListener("resize", updateGridLayout);
     } else {
         gameArea.classList.remove("grid-mode");
         gridToggleButton.innerHTML = `
@@ -982,12 +1005,24 @@ function setGridMode(enabled: boolean, forceLayout = false): void {
             <rect x="3" y="3" width="7" height="18"></rect>
             <rect x="14" y="3" width="7" height="18"></rect>
          </svg>
-      `;
+        `;
 
-        window.removeEventListener("resize", updateGridLayout);
         resetToFlexLayout();
     }
     updateScrollButtons();
+}
+
+function initGridLayoutObserver(): void {
+    const gameArea = document.querySelector("#game-area") as HTMLDivElement;
+
+    gridLayoutObserver?.disconnect();
+    gridLayoutObserver = new ResizeObserver(() => updateGridLayout());
+    gridLayoutObserver.observe(gameArea);
+}
+
+function readPixelValue(value: string): number {
+    const pixels = Number.parseFloat(value);
+    return Number.isFinite(pixels) ? pixels : 0;
 }
 
 function updateGridLayout(): void {
@@ -998,9 +1033,17 @@ function updateGridLayout(): void {
     const boardCount = matches.length;
     if (boardCount === 0) return;
 
-    // Margin/Padding offset
-    const winW = gameArea.clientWidth - 40;
-    const winH = gameArea.clientHeight - 40;
+    const style = getComputedStyle(gameArea);
+    const availableWidth =
+        gameArea.clientWidth -
+        readPixelValue(style.paddingLeft) -
+        readPixelValue(style.paddingRight);
+    const availableHeight =
+        gameArea.clientHeight -
+        readPixelValue(style.paddingTop) -
+        readPixelValue(style.paddingBottom);
+    const columnGap = readPixelValue(style.columnGap);
+    const rowGap = readPixelValue(style.rowGap);
 
     // Match Aspect Ratio: Width (8 squares) / Height (10 squares) = 0.8
     const ratio = 0.8;
@@ -1010,9 +1053,12 @@ function updateGridLayout(): void {
 
     for (let cols = 1; cols <= boardCount; cols++) {
         const rows = Math.ceil(boardCount / cols);
-        let w = winW / cols;
-        // Check if height exceeds available space
-        if (w * (1 / ratio) * rows > winH) w = (winH / rows) * ratio;
+        const horizontalGaps = columnGap * Math.max(0, cols - 1);
+        const verticalGaps = rowGap * Math.max(0, rows - 1);
+        let w = (availableWidth - horizontalGaps) / cols;
+        const heightConstrainedWidth =
+            ((availableHeight - verticalGaps) / rows) * ratio;
+        w = Math.min(w, heightConstrainedWidth);
 
         if (w > bestW) {
             bestW = w;
@@ -1025,9 +1071,9 @@ function updateGridLayout(): void {
     for (const match of matches) {
         const m = match as HTMLElement;
         // Apply the calculated width, height follows aspect ratio
-        m.style.width = `${bestW - 10}px`;
-        m.style.height = `${(bestW - 10) * (1 / ratio)}px`;
-        m.style.setProperty("--square-size", `${(bestW - 10) / 8}px`);
+        m.style.width = `${bestW}px`;
+        m.style.height = `${bestW * (1 / ratio)}px`;
+        m.style.setProperty("--square-size", `${bestW / 8}px`);
     }
 }
 

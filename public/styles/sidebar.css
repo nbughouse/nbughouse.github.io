@@ -43,6 +43,8 @@
 }
 
 #leave-game-btn {
+   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--red-dark);
+
    position: relative;
    display: flex;
    justify-content: center;
@@ -106,18 +108,14 @@
 }
 
 .ping-bar:nth-child(2) {
-   height: 1vh;
+   height: 1.125vh;
 }
 
 .ping-bar:nth-child(3) {
-   height: 1.375vh;
+   height: 1.625vh;
 }
 
 .ping-bar:nth-child(4) {
-   height: 1.75vh;
-}
-
-.ping-bar:nth-child(5) {
    height: 2.125vh;
 }
 
@@ -130,6 +128,9 @@
 #sidebar-tabs {
    --sidebar-tab-padding: 0.5vh;
    --sidebar-tab-gap: 0.5vh;
+   --sidebar-pill-x: 0;
+   --sidebar-pill-shadow: var(--shadow-button-side);
+
    display: grid;
    position: relative;
    grid-template-columns: 1fr 1fr;
@@ -149,12 +150,15 @@
    background: var(--surface-muted);
    width: calc((100% - (var(--sidebar-tab-padding) * 2) - var(--sidebar-tab-gap)) / 2);
    height: calc(100% - (var(--sidebar-tab-padding) * 2));
-   box-shadow: var(--shadow-button);
-   transition: transform 180ms ease;
+   box-shadow: var(--sidebar-pill-shadow);
+   transform: translateX(var(--sidebar-pill-x));
+   transition:
+      transform 180ms ease,
+      box-shadow 120ms ease;
 }
 
 #sidebar-tabs.settings-active::before {
-   transform: translateX(calc(100% + var(--sidebar-tab-gap)));
+   --sidebar-pill-x: calc(100% + var(--sidebar-tab-gap));
 }
 
 .sidebar-tab {
@@ -216,7 +220,7 @@
 }
 
 .player-item.status-disconnected {
-   background: color-mix(in srgb, var(--yellow) 24%, var(--surface));
+   background: var(--surface);
 }
 
 .player-item.status-spectating {
@@ -229,6 +233,15 @@
    flex: 0 0 auto;
    width: 2vh;
    height: 2vh;
+}
+
+.disconnected-icon {
+   flex: 0 0 auto;
+   background: var(--yellow);
+   width: 2vh;
+   height: 2vh;
+   -webkit-mask: url("/assets/img/disconnected.svg") center / contain no-repeat;
+   mask: url("/assets/img/disconnected.svg") center / contain no-repeat;
 }
 
 .player-stats {
@@ -341,6 +354,10 @@
    min-width: 0;
 }
 
+.settings-picker.open {
+   z-index: 1000;
+}
+
 .settings-picker-button {
    display: flex;
    align-items: center;
@@ -391,7 +408,7 @@
    position: absolute;
    top: calc(100% + 0.35vh);
    right: 0;
-   z-index: 50;
+   z-index: 1001;
    display: grid;
    gap: 0.25vh;
    border-radius: var(--radius-md);
@@ -421,6 +438,8 @@
 }
 
 .settings-picker-option.selected {
+   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--green-dark);
+
    background: var(--green);
    color: var(--text);
 }
@@ -505,6 +524,8 @@
 }
 
 #ready-btn {
+   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--green-dark);
+
    flex: 1 1 auto;
    cursor: pointer;
    border: none;
@@ -542,13 +563,18 @@
 
 #ready-btn.waiting,
 #ready-btn:disabled {
+   --shadow-button-side: 0 var(--shadow-bottom-size) 0 rgba(0, 0, 0, 0.18);
+
    cursor: default;
    background: var(--surface-raised);
    color: var(--hidden-text);
 }
 
 #resign-btn {
+   --shadow-button-side: 0 var(--shadow-bottom-size) 0 var(--red-dark);
+
    cursor: pointer;
+   display: none;
    margin: var(--sidebar-section-gap) var(--sidebar-margin) 0
       var(--sidebar-margin);
    border: none;
@@ -572,20 +598,25 @@
 }
 
 #chat-messages {
+   display: flex;
+   flex-direction: column;
    flex: 1;
-   margin-bottom: 1.875vh;
    border-radius: var(--radius-md);
    background: var(--primary);
-   padding: 1.875vh;
+   padding: var(--sidebar-section-gap);
    min-height: 0;
    overflow-y: auto;
+}
+
+#chat-message-list {
+   flex: 1;
 }
 
 .chat-message {
    margin-bottom: 1.25vh;
    border: none;
    border-radius: var(--radius-md);
-   padding: 1vh 1.5vh;
+   padding: 0.85vh 1vh;
    font-size: 1.85vh;
    word-wrap: break-word;
    background: var(--primary);
@@ -594,6 +625,10 @@
 
 .chat-message.own {
    background: var(--green-dark);
+}
+
+.chat-message:not(.own):not(.server) {
+   background: var(--surface);
 }
 
 .chat-message.server {
@@ -611,16 +646,20 @@
 }
 
 #chat-input-container {
+   position: sticky;
+   bottom: 0;
    display: flex;
    gap: 1vh;
    width: 100%;
+   padding-top: 0.625vh;
+   background: var(--primary);
 }
 
 #chat-input {
    flex: 1;
    outline: none;
    border-radius: var(--radius-md);
-   background: var(--primary);
+   background: var(--surface);
    padding: 1.25vh 1.5vh;
    font-size: 1.85vh;
 }

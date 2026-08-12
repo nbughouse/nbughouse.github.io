@@ -78,12 +78,14 @@ export function createSettingsSelect(
 
     const close = () => {
         menu.classList.add("hidden");
+        picker.classList.remove("open");
         button.setAttribute("aria-expanded", "false");
         preview?.(select.value);
     };
 
     const open = () => {
         closeOpenPickers();
+        picker.classList.add("open");
         menu.classList.remove("hidden");
         button.setAttribute("aria-expanded", "true");
     };
@@ -191,6 +193,8 @@ function closeOpenPickers(resetPreview = false): void {
         menu.classList.add("hidden");
     for (const button of document.querySelectorAll(".settings-picker-button"))
         button.setAttribute("aria-expanded", "false");
+    for (const picker of document.querySelectorAll(".settings-picker"))
+        picker.classList.remove("open");
 }
 
 function syncSelectedOption(select: HTMLSelectElement, menu: HTMLElement): void {

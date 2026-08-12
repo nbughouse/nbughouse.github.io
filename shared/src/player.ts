@@ -23,13 +23,6 @@ export class Player {
         this.name = name;
         this.status = status;
     }
-
-    clone(): Player {
-        const player = new Player(this.id, this.name, this.status);
-        player.wins = this.wins;
-        player.total = this.total;
-        return player;
-    }
 }
 
 export function getPlayerDisplayName(player: Pick<Player, "name">): string {

@@ -160,6 +160,7 @@
 }
 
 .player-name-plaque {
+   display: flex;
    position: absolute;
    z-index: 2;
    left: 50%;
@@ -174,10 +175,42 @@
    font-weight: var(--font-weight-bold);
    font-size: calc(var(--square-size) * 0.28);
    line-height: 1;
+   justify-content: center;
+   align-items: center;
+   gap: calc(var(--square-size) * 0.1);
    text-align: center;
-   text-overflow: ellipsis;
    white-space: nowrap;
    pointer-events: none;
+}
+
+.player-plaque-name {
+   min-width: 0;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}
+
+.player-plaque-badges {
+   display: inline-flex;
+   flex: 0 0 auto;
+   align-items: center;
+   gap: calc(var(--square-size) * 0.06);
+}
+
+.player-plaque-badge {
+   display: block;
+   flex: 0 0 auto;
+   width: calc(var(--square-size) * 0.24);
+   height: calc(var(--square-size) * 0.24);
+}
+
+.player-plaque-crown {
+   object-fit: contain;
+}
+
+.player-plaque-disconnected {
+   background: var(--yellow);
+   -webkit-mask: var(--player-plaque-disconnected-icon) center / contain no-repeat;
+   mask: var(--player-plaque-disconnected-icon) center / contain no-repeat;
 }
 
 .player-name-plaque[hidden] {
@@ -344,7 +377,8 @@
 }
 
 /* Pieces */
-.square .piece {
+.square .piece,
+.pocket-piece .piece {
    position: relative;
    z-index: 2;
    width: calc(var(--square-size) * 0.941);
@@ -397,6 +431,7 @@
    background: transparent;
    height: calc(var(--square-size) * 0.2);
    overflow: hidden;
+   color: var(--text-secondary);
    font-weight: var(--font-weight-bold);
    font-size: calc(var(--square-size) * 0.15);
    text-overflow: ellipsis;
@@ -432,8 +467,8 @@
 }
 
 .player-time-display.black-clock.active-clock {
-   background: #2B2926;
-   color: #82807F;
+   background: #262421;
+   color: #FFFFFF;
 }
 
 .clock-value {

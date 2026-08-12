@@ -161,6 +161,7 @@ setInterval(() => {
                     getPlayerDisplayName(timeout.player) + " timed out.",
                     currentTime,
                 );
+                if (room.players.size === 0) rooms.delete(code);
             }
         }
     }
