@@ -229,6 +229,18 @@
    opacity: 0.4;
 }
 
+.player-item.own {
+   background: var(--green-dark);
+}
+
+.player-item.teammate {
+   background: var(--blue);
+}
+
+.player-item.opponent {
+   background: var(--red);
+}
+
 .spectating-icon {
    flex: 0 0 auto;
    width: 2vh;
@@ -627,11 +639,19 @@
    background: var(--green-dark);
 }
 
-.chat-message:not(.own):not(.server) {
-   background: var(--surface);
+.chat-message.teammate {
+   background: var(--blue);
+}
+
+.chat-message.opponent {
+   background: var(--red);
 }
 
 .chat-message.server {
+   background: var(--surface);
+}
+
+.chat-message:not(.own):not(.teammate):not(.opponent):not(.server) {
    background: var(--surface);
 }
 

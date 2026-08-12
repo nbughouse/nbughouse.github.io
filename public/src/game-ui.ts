@@ -12,7 +12,7 @@ import {
     type Player,
     PlayerStatus,
 } from "@shared/player";
-import { RoomStatus, type Team } from "@shared/room";
+import { RoomStatus, Team } from "@shared/room";
 import {
     clearLatestWinners,
     createMatchElements,
@@ -758,7 +758,9 @@ export function updateUIPlayerList(): void {
 
             const isCurrentPlayer = id === gs.player.id;
 
-            playerDiv.className = `player-item ${statusClass}`;
+            const relationshipClass = getPlayerRelationshipClass(id);
+            playerDiv.className =
+                `player-item ${statusClass} ${relationshipClass}`.trim();
             playerDiv.dataset.playerId = id;
             nameDiv.className = "player-name";
             nameDiv.textContent = getPlayerDisplayName(player);
@@ -852,9 +854,12 @@ export function updateUIPushChat(message: ChatMessage): void {
     };
 
     const messageDiv = document.createElement("div");
+    const relationshipClass = getPlayerRelationshipClass(message.id);
     messageDiv.className = `chat-message ${
         message.id === gs.player.id ? "own" : ""
-    } ${message.id === "server" ? "server" : ""}`.trim();
+    } ${message.id === "server" ? "server" : ""} ${
+        relationshipClass
+    }`.trim();
 
     const senderName = getSenderName();
     const previousMessage = chatMessageList.lastElementChild as HTMLElement | null;
@@ -883,6 +888,24 @@ export function updateUIPushChat(message: ChatMessage): void {
     messageDiv.append(senderDiv, textDiv);
     chatMessageList.append(messageDiv);
     chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+}
+
+function getPlayerRelationshipClass(playerID: string): string {
+    if (playerID === "server") return "";
+    if (playerID === gs.player.id) return "own";
+
+    const ownTeam = getPlayerTeam(gs.player.id);
+    const playerTeam = getPlayerTeam(playerID);
+    if (!ownTeam || !playerTeam) return "";
+
+    return ownTeam === playerTeam ? "teammate" : "opponent";
+}
+
+function getPlayerTeam(playerID: string): Team | undefined {
+    for (const match of gs.room.game.matches) {
+        if (match.getPlayerTeam(Team.BLUE)?.id === playerID) return Team.BLUE;
+        if (match.getPlayerTeam(Team.RED)?.id === playerID) return Team.RED;
+    }
 }
 
 export function sendChatMessage(): void {

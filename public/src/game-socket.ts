@@ -94,6 +94,8 @@ export function initGameSocket(): void {
 
             gs.room.game.matches[boardID].setPlayer(player, color);
             updateUIPlayers(boardID);
+            updateUIPlayerList();
+            updateUIAllChat();
             refreshDualBoardLayout();
         },
     );
@@ -101,6 +103,8 @@ export function initGameSocket(): void {
     gs.socket.on("p-left-board", (boardID: number, color: Color) => {
         gs.room.game.matches[boardID].removePlayer(color);
         updateUIPlayers(boardID);
+        updateUIPlayerList();
+        updateUIAllChat();
         refreshDualBoardLayout();
     });
 
@@ -126,6 +130,7 @@ export function initGameSocket(): void {
         updateUIAllPlayers();
         updateUITime();
         updateUIPlayerList();
+        updateUIAllChat();
         updateRoomSettingsUI();
     });
 
@@ -135,6 +140,8 @@ export function initGameSocket(): void {
         for (const match of gs.room.game.matches) match.lastMoveTime = timeStarted;
         clearLastMoves();
         startGameUI();
+        updateUIPlayerList();
+        updateUIAllChat();
         startTimeUpdates();
 
     });
