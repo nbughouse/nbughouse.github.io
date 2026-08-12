@@ -30,7 +30,12 @@ let selected:
       }
     | undefined;
 
-let promotionCallback: ((pieceType: PieceType) => void) | undefined;
+let pendingPromotion:
+    | {
+          dialog: HTMLDivElement;
+          callback: (pieceType: PieceType) => void;
+      }
+    | undefined;
 
 interface BoardMarks {
     marked: boolean[][];
@@ -318,11 +323,21 @@ function showPromotionDialog(
     color: Color,
     callback: (pieceType: PieceType) => void,
 ): void {
-    promotionCallback = callback;
+    if (pendingPromotion) return;
+
+    // Clean up any dialog left behind by an earlier version of the UI before
+    // creating the single active promotion prompt.
+    for (const staleDialog of document.querySelectorAll(".promotion-dialog"))
+        staleDialog.remove();
 
     const dialog = document.createElement("div");
     dialog.className = "promotion-dialog";
     dialog.id = `promotion-dialog-${boardID}`;
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-label", "Choose a promotion piece");
+    dialog.setAttribute("aria-modal", "true");
+
+    pendingPromotion = { dialog, callback };
 
     const pieces = [
         PieceType.QUEEN,
@@ -344,13 +359,22 @@ function showPromotionDialog(
 }
 
 function handlePromotionChoice(pieceType: PieceType): void {
-    const dialog = document.querySelector(".promotion-dialog");
-    if (dialog) dialog.remove();
+    const promotion = pendingPromotion;
+    if (!promotion) return;
 
-    if (promotionCallback) {
-        promotionCallback(pieceType);
-        promotionCallback = undefined;
-    }
+    // Clear the pending state before executing the move. This keeps the modal
+    // lifecycle correct even if the callback synchronously updates the board.
+    pendingPromotion = undefined;
+    promotion.dialog.remove();
+    promotion.callback(pieceType);
+}
+
+function closePromotionDialog(): void {
+    pendingPromotion?.dialog.remove();
+    pendingPromotion = undefined;
+
+    for (const staleDialog of document.querySelectorAll(".promotion-dialog"))
+        staleDialog.remove();
 }
 
 // MARK: Piece Selection
@@ -850,6 +874,7 @@ export function rememberLastMove(boardID: number, move: Move): void {
 
 export function clearLastMoves(): void {
     lastMoves.clear();
+    closePromotionDialog();
 }
 
 // MARK: Mouse Handlers
@@ -867,6 +892,8 @@ function handleMouseMove(event: MouseEvent): void {
 }
 
 function handleSquareMouseDown(event: MouseEvent): void {
+    if (pendingPromotion) return;
+
     const square = event.currentTarget as HTMLElement;
 
     const { pos, id } = getPositionFromElement(square);
@@ -914,6 +941,8 @@ function handleSquareMouseDown(event: MouseEvent): void {
 }
 
 function handleSquareMouseUp(event: MouseEvent): void {
+    if (pendingPromotion) return;
+
     const square = event.currentTarget as HTMLElement;
     const { pos, id } = getPositionFromElement(square);
 
@@ -993,6 +1022,8 @@ function finishRightAnnotation(id: number, pos: BoardPosition): void {
 }
 
 function handlePocketMouseDown(event: MouseEvent): void {
+    if (pendingPromotion) return;
+
     const target = event.target as HTMLElement;
     const { pos, id } = getPositionFromElement(target);
 
@@ -1010,6 +1041,8 @@ function handlePocketMouseDown(event: MouseEvent): void {
 }
 
 function handlePocketMouseUp(event: MouseEvent): void {
+    if (pendingPromotion) return;
+
     const target = event.target as HTMLElement;
     if (!selected) return;
     const { pos, id } = getPositionFromElement(target);
