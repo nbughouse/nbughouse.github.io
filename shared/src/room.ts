@@ -488,9 +488,10 @@ function resetMatchChess(
 }
 
 /**
- * Randomly assigns every available player to exactly one team. Players may cover
- * multiple boards, but their assignments are balanced within their team and
- * always form one contiguous run of board indexes.
+ * Randomly assigns available players to teams, trimming overfull rooms to the
+ * available board seats. Players may cover multiple boards, but their
+ * assignments are balanced within their team and always form one contiguous run
+ * of board indexes.
  */
 export function randomizeMatchPlayers(
     matches: Match[],
@@ -513,8 +514,11 @@ export function randomizeMatchPlayers(
             playersByID.set(match.blackPlayer.id, match.blackPlayer);
     }
 
-    const players = shuffle([...playersByID.values()], random);
-    if (players.length < 2 || players.length > matches.length * 2) return false;
+    const players = shuffle([...playersByID.values()], random).slice(
+        0,
+        matches.length * 2,
+    );
+    if (players.length < 2) return false;
 
     // A team cannot contain more players than it has board positions. Keeping
     // the team sizes as close as possible also minimizes assignment imbalance.

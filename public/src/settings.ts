@@ -150,6 +150,7 @@ export class Settings {
     sounds = true;
     soundTheme: SoundTheme = "standard";
     showLegalMoves = true;
+    messageGrouping = false;
 
     constructor() {
         this.load();
@@ -186,6 +187,7 @@ export class Settings {
             sounds: this.sounds,
             soundTheme: this.soundTheme,
             showLegalMoves: this.showLegalMoves,
+            messageGrouping: this.messageGrouping,
         };
     }
 
@@ -216,6 +218,7 @@ interface SettingsData {
     sounds: boolean;
     soundTheme: SoundTheme;
     showLegalMoves: boolean;
+    messageGrouping: boolean;
 }
 
 function getCookie(name: string): string | undefined {

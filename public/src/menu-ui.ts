@@ -310,6 +310,7 @@ function setupSettingsView(): void {
     );
     bindMenuSettingCheckbox("#menu-setting-sounds", "sounds", false);
     bindMenuSettingCheckbox("#menu-setting-legal-moves", "showLegalMoves");
+    bindMenuSettingCheckbox("#menu-setting-message-grouping", "messageGrouping", false);
 }
 
 function getPieceThemeOptions(): { value: string; label: string }[] {
@@ -340,7 +341,8 @@ function bindMenuSettingCheckbox(
         | "showBoardCoords"
         | "highlightLastMove"
         | "sounds"
-        | "showLegalMoves",
+        | "showLegalMoves"
+        | "messageGrouping",
     redraw = true,
 ): void {
     const checkbox = document.querySelector(selector) as HTMLInputElement;
@@ -382,6 +384,7 @@ function updateMenuSettingsUI(): void {
     );
     setCheckbox("#menu-setting-sounds", settings.sounds);
     setCheckbox("#menu-setting-legal-moves", settings.showLegalMoves);
+    setCheckbox("#menu-setting-message-grouping", settings.messageGrouping);
 }
 
 function setSelectValue(selector: string, value: string): void {

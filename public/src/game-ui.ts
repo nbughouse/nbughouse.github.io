@@ -808,7 +808,8 @@ export function updateUIPushChat(message: ChatMessage): void {
     const senderName = getSenderName();
     const previousMessage = chatMessageList.lastElementChild as HTMLElement | null;
 
-    if (previousMessage?.dataset.senderId === message.id) {
+    if (gs.settings.messageGrouping && previousMessage?.dataset.senderId === message.id) {
+        previousMessage.classList.add("grouped");
         const text = previousMessage.querySelector(".chat-text");
         if (text)
             text.textContent = text.textContent
