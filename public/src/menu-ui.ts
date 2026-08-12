@@ -1,4 +1,4 @@
-import { stopPingUpdates } from "./game-ui";
+import { refreshDualBoardLayout, stopPingUpdates } from "./game-ui";
 import { stopTimeUpdates } from "./match-ui";
 import { roomExists } from "./room-api";
 import { setStoredProfileValue, sn } from "./session";
@@ -311,6 +311,12 @@ function setupSettingsView(): void {
     bindMenuSettingCheckbox("#menu-setting-sounds", "sounds", false);
     bindMenuSettingCheckbox("#menu-setting-legal-moves", "showLegalMoves");
     bindMenuSettingCheckbox("#menu-setting-message-grouping", "messageGrouping", false);
+    bindMenuSettingCheckbox(
+        "#menu-setting-dual-board-ui",
+        "dualBoardUI",
+        false,
+        refreshDualBoardLayout,
+    );
 }
 
 function getPieceThemeOptions(): { value: string; label: string }[] {
@@ -342,13 +348,16 @@ function bindMenuSettingCheckbox(
         | "highlightLastMove"
         | "sounds"
         | "showLegalMoves"
-        | "messageGrouping",
+        | "messageGrouping"
+        | "dualBoardUI",
     redraw = true,
+    afterChange?: () => void,
 ): void {
     const checkbox = document.querySelector(selector) as HTMLInputElement;
     checkbox.addEventListener("change", () => {
         sn.settings[key] = checkbox.checked;
         saveMenuSettings(redraw);
+        afterChange?.();
     });
 }
 
@@ -385,6 +394,7 @@ function updateMenuSettingsUI(): void {
     setCheckbox("#menu-setting-sounds", settings.sounds);
     setCheckbox("#menu-setting-legal-moves", settings.showLegalMoves);
     setCheckbox("#menu-setting-message-grouping", settings.messageGrouping);
+    setCheckbox("#menu-setting-dual-board-ui", settings.dualBoardUI);
 }
 
 function setSelectValue(selector: string, value: string): void {

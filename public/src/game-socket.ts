@@ -10,6 +10,7 @@ import {
 import {
     endGameUI,
     rebuildRoomBoardElements,
+    refreshDualBoardLayout,
     showRoomElements,
     startGameUI,
     updateUIAllChat,
@@ -93,12 +94,14 @@ export function initGameSocket(): void {
 
             gs.room.game.matches[boardID].setPlayer(player, color);
             updateUIPlayers(boardID);
+            refreshDualBoardLayout();
         },
     );
 
     gs.socket.on("p-left-board", (boardID: number, color: Color) => {
         gs.room.game.matches[boardID].removePlayer(color);
         updateUIPlayers(boardID);
+        refreshDualBoardLayout();
     });
 
     gs.socket.on("p-set-status", (id: string, status: PlayerStatus) => {

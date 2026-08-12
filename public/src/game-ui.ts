@@ -25,6 +25,7 @@ import { createSettingsSelect, syncHoverPreviewSelect } from "./settings-ui";
 
 let gridMode = false;
 let gridLayoutObserver: ResizeObserver | undefined;
+let dualBoardPrimaryID: number | undefined;
 
 let pingIntervalID: number;
 let pingStartTime: number = 0;
@@ -508,6 +509,7 @@ function showPlayersTab(): void {
 
 export function rebuildRoomBoardElements(): void {
     const boardsArea = document.querySelector("#game-area") as HTMLDivElement;
+    dualBoardPrimaryID = undefined;
     for (const container of boardsArea.querySelectorAll(".game-container"))
         container.remove();
     for (const container of boardsArea.querySelectorAll(".match-container"))
@@ -1045,9 +1047,14 @@ function updateGridLayout(): void {
         readPixelValue(style.paddingBottom);
     const columnGap = readPixelValue(style.columnGap);
     const rowGap = readPixelValue(style.rowGap);
+    const plaqueHeightRatio = readPixelValue(
+        style.getPropertyValue("--plaque-height-ratio"),
+    );
 
-    // Match Aspect Ratio: Width (8 squares) / Height (10 squares) = 0.8
-    const ratio = 0.8;
+    // The match itself is 8 squares wide by 10 high. In grid mode, the two
+    // externally positioned player plaques are also part of its visual height.
+    const matchRatio = 8 / 10;
+    const visualRatio = 8 / (10 + plaqueHeightRatio * 2);
 
     let bestW = 0;
     let bestCols = 1;
@@ -1058,7 +1065,7 @@ function updateGridLayout(): void {
         const verticalGaps = rowGap * Math.max(0, rows - 1);
         let w = (availableWidth - horizontalGaps) / cols;
         const heightConstrainedWidth =
-            ((availableHeight - verticalGaps) / rows) * ratio;
+            ((availableHeight - verticalGaps) / rows) * visualRatio;
         w = Math.min(w, heightConstrainedWidth);
 
         if (w > bestW) {
@@ -1067,13 +1074,53 @@ function updateGridLayout(): void {
         }
     }
 
+    const useDualBoardUI = gs.settings.dualBoardUI && boardCount === 2;
+
+    gameArea.classList.toggle("dual-board-ui", useDualBoardUI);
+
+    if (useDualBoardUI) {
+        const controlledBoardIDs = getControlledBoardIDs();
+        const controlledBoardID =
+            controlledBoardIDs.length === 1 ? controlledBoardIDs[0] : undefined;
+        if (gs.room.status === RoomStatus.LOBBY) {
+            if (controlledBoardID !== undefined)
+                dualBoardPrimaryID = controlledBoardID;
+            else dualBoardPrimaryID ??= 0;
+        } else if (dualBoardPrimaryID === undefined) {
+            dualBoardPrimaryID = controlledBoardID ?? 0;
+        }
+
+        const secondaryScale = controlledBoardIDs.length === 2 ? 1 : 0.8;
+        const normalWidth = Math.max(
+            0,
+            Math.min(
+                (availableWidth - columnGap) / (1 + secondaryScale),
+                availableHeight * visualRatio,
+            ),
+        );
+
+        gameArea.style.gridTemplateColumns = "auto auto";
+        for (const match of matches) {
+            const element = match as HTMLElement;
+            const isPrimary =
+                Number(element.dataset.boardID) === dualBoardPrimaryID;
+            const width = normalWidth * (isPrimary ? 1 : secondaryScale);
+            element.style.order = isPrimary ? "0" : "1";
+            element.style.width = `${width}px`;
+            element.style.height = `${width * (1 / matchRatio)}px`;
+            element.style.setProperty("--square-size", `${width / 8}px`);
+        }
+        return;
+    }
+
     gameArea.style.gridTemplateColumns = `repeat(${bestCols}, auto)`;
 
     for (const match of matches) {
         const m = match as HTMLElement;
+        m.style.order = "";
         // Apply the calculated width, height follows aspect ratio
         m.style.width = `${bestW}px`;
-        m.style.height = `${bestW * (1 / ratio)}px`;
+        m.style.height = `${bestW * (1 / matchRatio)}px`;
         m.style.setProperty("--square-size", `${bestW / 8}px`);
     }
 }
@@ -1083,12 +1130,37 @@ function resetToFlexLayout(): void {
     const matches = gameArea.querySelectorAll(".match-container");
 
     gameArea.style.gridTemplateColumns = "";
+    gameArea.classList.remove("dual-board-ui");
     for (const match of matches) {
         const m = match as HTMLElement;
+        m.style.order = "";
         m.style.width = "";
         m.style.height = "";
         m.style.removeProperty("--square-size");
     }
+}
+
+function getControlledBoardIDs(): number[] {
+    if (!gs.room || !gs.player) return [];
+
+    return gs.room.game.matches
+        .map((match, boardID) =>
+            match.whitePlayer?.id === gs.player.id ||
+            match.blackPlayer?.id === gs.player.id
+                ? boardID
+                : undefined,
+        )
+        .filter((boardID): boardID is number => boardID !== undefined);
+}
+
+export function refreshDualBoardLayout(): void {
+    if (gridMode) updateGridLayout();
+}
+
+function lockDualBoardOrderForGame(): void {
+    const controlledBoardIDs = getControlledBoardIDs();
+    if (controlledBoardIDs.length === 1)
+        dualBoardPrimaryID = controlledBoardIDs[0];
 }
 
 // MARK: Start/End Game UI
@@ -1102,6 +1174,7 @@ export function startGameUI(): void {
     ) as HTMLButtonElement;
 
     clearLatestWinners();
+    lockDualBoardOrderForGame();
 
     // Show resign button only if player is in the game
     if (isPlayerInGame()) {
@@ -1128,6 +1201,7 @@ export function startGameUI(): void {
     // If more boards have this player on top than bottom, flip all boards
     setVisualFlipped(topBottomDelta > 0);
     updateUIAllGame();
+    refreshDualBoardLayout();
     initScrollControls();
 }
 

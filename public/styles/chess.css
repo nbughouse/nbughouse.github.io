@@ -23,6 +23,8 @@
 
 #game-area {
    --square-size: 8.85vh;
+   --plaque-height-ratio: 0.4;
+   --plaque-height: calc(var(--square-size) * var(--plaque-height-ratio));
    display: flex;
    position: relative;
    flex: 1;
@@ -46,7 +48,12 @@
    overflow-y: auto;
 }
 
+#game-area.grid-mode.dual-board-ui {
+   align-items: center;
+}
+
 #game-area.grid-mode .match-container {
+   margin-block: var(--plaque-height);
    min-width: unset;
    min-height: unset;
 }
@@ -55,7 +62,7 @@
 .match-container {
    display: flex;
    flex-direction: column;
-   box-shadow: var(--shadow-soft);
+   filter: drop-shadow(var(--shadow-soft));
    border-radius: var(--radius-lg);
    background: var(--primary);
    min-width: calc(var(--square-size) * 8);
@@ -165,13 +172,13 @@
    z-index: 2;
    left: 50%;
    border-radius: var(--radius-sm);
-   background: var(--primary);
+   background: var(--secondary);
    padding: calc(var(--square-size) * 0.075) calc(var(--square-size) * 0.28);
    min-width: calc(var(--square-size) * 2.65);
-   min-height: calc(var(--square-size) * 0.4);
+   height: var(--plaque-height);
+   min-height: var(--plaque-height);
    max-width: calc(100% - (var(--square-size) * 0.32));
    overflow: hidden;
-   box-shadow: var(--shadow-button);
    font-weight: var(--font-weight-bold);
    font-size: calc(var(--square-size) * 0.28);
    line-height: 1;
@@ -219,12 +226,14 @@
 
 .pocket-row-top .player-name-plaque {
    top: 0;
-   transform: translate(-50%, -50%);
+   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+   transform: translate(-50%, -100%);
 }
 
 .pocket-row-bottom .player-name-plaque {
    bottom: 0;
-   transform: translate(-50%, 50%);
+   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+   transform: translate(-50%, 100%);
 }
 
 /* Board */

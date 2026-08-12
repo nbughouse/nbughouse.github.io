@@ -151,6 +151,7 @@ export class Settings {
     soundTheme: SoundTheme = "standard";
     showLegalMoves = true;
     messageGrouping = false;
+    dualBoardUI = true;
 
     constructor() {
         this.load();
@@ -188,6 +189,7 @@ export class Settings {
             soundTheme: this.soundTheme,
             showLegalMoves: this.showLegalMoves,
             messageGrouping: this.messageGrouping,
+            dualBoardUI: this.dualBoardUI,
         };
     }
 
@@ -203,6 +205,8 @@ export class Settings {
 
         if (!soundThemes.some((theme) => theme.id === this.soundTheme))
             this.soundTheme = "standard";
+
+        if (typeof this.dualBoardUI !== "boolean") this.dualBoardUI = true;
     }
 }
 
@@ -219,6 +223,7 @@ interface SettingsData {
     soundTheme: SoundTheme;
     showLegalMoves: boolean;
     messageGrouping: boolean;
+    dualBoardUI: boolean;
 }
 
 function getCookie(name: string): string | undefined {
