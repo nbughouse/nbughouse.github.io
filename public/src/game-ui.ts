@@ -239,7 +239,14 @@ function initSidebarTabs(): void {
             { value: "default", label: "Default" },
             { value: "960", label: "Chess960" },
             { value: "koedem", label: "Koedem" },
+            { value: "accolade", label: "Accolade" },
             { value: "960+koedem", label: "Chess960 + Koedem" },
+            { value: "960+accolade", label: "Chess960 + Accolade" },
+            { value: "koedem+accolade", label: "Koedem + Accolade" },
+            {
+                value: "960+koedem+accolade",
+                label: "Chess960 + Koedem + Accolade",
+            },
             { value: "custom", label: "Custom FEN" },
         ],
     );
@@ -714,12 +721,17 @@ function parseInitialBoardVariants(initialBoard: string): Set<string> {
     return new Set(
         normalized
             .split("+")
-            .filter((current) => current === "960" || current === "koedem"),
+            .filter(
+                (current) =>
+                    current === "960" ||
+                    current === "koedem" ||
+                    current === "accolade",
+            ),
     );
 }
 
 function serializeInitialBoardVariants(variants: Set<string>): string {
-    const orderedVariants = ["960", "koedem"].filter((variant) =>
+    const orderedVariants = ["960", "koedem", "accolade"].filter((variant) =>
         variants.has(variant),
     );
     return orderedVariants.length ? orderedVariants.join("+") : "default";
@@ -730,14 +742,13 @@ function setInitialBoardUI(
     fenInput: HTMLInputElement,
     initialBoard: string,
 ): void {
+    const normalized = initialBoard === "random" ? "960" : initialBoard;
+    const variants = parseInitialBoardVariants(normalized);
     if (
-        initialBoard === "default" ||
-        initialBoard === "960" ||
-        initialBoard === "koedem" ||
-        initialBoard === "960+koedem" ||
-        initialBoard === "random"
+        normalized === "default" ||
+        serializeInitialBoardVariants(variants) === normalized
     ) {
-        modeSelect.value = initialBoard === "random" ? "960" : initialBoard;
+        modeSelect.value = normalized;
         fenInput.value = "";
         syncInitialBoardFenVisibility(modeSelect, fenInput);
         return;

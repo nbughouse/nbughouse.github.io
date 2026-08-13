@@ -164,8 +164,8 @@ export function initGameSocket(): void {
             if (currentMatch.queued.color === currentMatch.chess.turn)
                 currentMatch.queued.moves.shift();
 
-            gs.room.game.doMove(boardID, move);
             rememberLastMove(boardID, move);
+            gs.room.game.doMove(boardID, move);
 
             for (const match of gs.room.game.matches) {
                 if (match.queued.moves.length === 0) continue;

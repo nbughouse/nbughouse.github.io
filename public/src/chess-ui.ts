@@ -53,6 +53,14 @@ const lastMoves: Map<number, Move> = new Map();
 const lastMoveAnimationSerials: Map<number, number> = new Map();
 const animatedMoveSerials: Map<number, number> = new Map();
 const suppressedMoveAnimations: Map<number, string[]> = new Map();
+const lastMoveAnimationPieces: Map<
+    number,
+    {
+        from?: Piece;
+        to?: Piece;
+        suppressTravel: boolean;
+    }
+> = new Map();
 let nextMoveAnimationSerial = 1;
 
 interface BoardArrow {
@@ -168,16 +176,36 @@ function getPieceClassNames(piece: Piece): string[] {
         [PieceType.PROMOTED_QUEEN]: "queen",
     };
 
-    return [
+    const classNames = [
         "piece",
         pieceClassByType[piece.type],
         piece.color === Color.WHITE ? "white" : "black",
     ];
+    if (piece.combinedWith) classNames.push("accolade-piece");
+    return classNames;
 }
 
 export function createPieceElement(piece: Piece): HTMLDivElement {
     const element = document.createElement("div");
     element.className = getPieceClassNames(piece).join(" ");
+
+    if (piece.combinedWith) {
+        const badgeType =
+            piece.combinedWith === PieceType.PROMOTED_QUEEN
+                ? PieceType.QUEEN
+                : piece.combinedWith;
+        const badge = document.createElement("div");
+        badge.className = getPieceClassNames({
+            type: badgeType,
+            color: piece.color,
+        })
+            .filter((className) => className !== "piece")
+            .concat("accolade-badge")
+            .join(" ");
+        badge.setAttribute("aria-hidden", "true");
+        element.append(badge);
+    }
+
     return element;
 }
 
@@ -390,7 +418,7 @@ function holdPiece(mouseEvent: MouseEvent): void {
 
     const pieceImg = getPieceElement(selected.boardID, selected.pos);
 
-    const dragImg = pieceImg.cloneNode(false) as HTMLElement;
+    const dragImg = pieceImg.cloneNode(true) as HTMLElement;
 
     dragImg.classList.add("dragged-piece");
     dragImg.style.width = `${pieceImg.offsetWidth}px`;
@@ -610,10 +638,24 @@ function animateLastMove(boardID: number): void {
 
     animatedMoveSerials.set(boardID, serial);
 
-    if (move.from.loc !== "board" || move.to.loc !== "board") return;
-
     const speed = gs.settings.pieceAnimationSpeed;
-    if (speed <= 0) return;
+    if (
+        speed <= 0 ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+        return;
+
+    const animationPieces = lastMoveAnimationPieces.get(boardID);
+    if (
+        animationPieces &&
+        move.to.loc === "board" &&
+        isAccoladeCombination(animationPieces.from, animationPieces.to)
+    ) {
+        animateAccoladeCombination(boardID, move, animationPieces, speed);
+        return;
+    }
+
+    if (move.from.loc !== "board" || move.to.loc !== "board") return;
 
     const fromSquare = getSquareElement(boardID, move.from);
     const toSquare = getSquareElement(boardID, move.to);
@@ -647,6 +689,113 @@ function animateLastMove(boardID: number): void {
 
     pieceElement.addEventListener("transitionend", cleanup, { once: true });
     window.setTimeout(cleanup, duration + 50);
+}
+
+function isAccoladeCombination(from?: Piece, to?: Piece): boolean {
+    if (!from || !to || from.color !== to.color) return false;
+    if (from.combinedWith || to.combinedWith) return false;
+
+    const partnerTypes = new Set([
+        PieceType.BISHOP,
+        PieceType.ROOK,
+        PieceType.QUEEN,
+        PieceType.PROMOTED_QUEEN,
+    ]);
+    return (
+        (from.type === PieceType.KNIGHT && partnerTypes.has(to.type)) ||
+        (to.type === PieceType.KNIGHT && partnerTypes.has(from.type))
+    );
+}
+
+function animateAccoladeCombination(
+    boardID: number,
+    move: Move,
+    pieces: { from?: Piece; to?: Piece; suppressTravel: boolean },
+    speed: number,
+): void {
+    if (move.to.loc !== "board" || !pieces.from || !pieces.to) return;
+
+    const toSquare = getSquareElement(boardID, move.to);
+    const result = toSquare.querySelector(
+        ":scope > .piece",
+    ) as HTMLElement | null;
+    if (!result?.classList.contains("accolade-piece")) return;
+
+    const fullDuration = Math.round(360 / speed);
+    const revealDuration = Math.round(fullDuration * 0.38);
+    const animateTravel = !pieces.suppressTravel && move.from.loc === "board";
+    const revealDelay = animateTravel ? fullDuration - revealDuration : 0;
+
+    result.classList.add("accolade-combine-result");
+    result.style.setProperty("--accolade-reveal-duration", `${revealDuration}ms`);
+    result.style.setProperty("--accolade-reveal-delay", `${revealDelay}ms`);
+
+    const ghosts: HTMLElement[] = [];
+    if (animateTravel && move.from.loc === "board") {
+        const fromSquare = getSquareElement(boardID, move.from);
+        const fromRect = fromSquare.getBoundingClientRect();
+        const toRect = toSquare.getBoundingClientRect();
+        const movingPiece = createPieceElement(pieces.from);
+        const targetPiece = createPieceElement(pieces.to);
+
+        movingPiece.classList.add(
+            "accolade-combine-layer",
+            "accolade-combine-moving",
+        );
+        targetPiece.classList.add(
+            "accolade-combine-layer",
+            "accolade-combine-target",
+        );
+        movingPiece.style.setProperty(
+            "--accolade-from-x",
+            `${fromRect.left - toRect.left}px`,
+        );
+        movingPiece.style.setProperty(
+            "--accolade-from-y",
+            `${fromRect.top - toRect.top}px`,
+        );
+        movingPiece.style.setProperty(
+            "--accolade-travel-duration",
+            `${fullDuration}ms`,
+        );
+        movingPiece.style.setProperty(
+            "--accolade-reveal-duration",
+            `${revealDuration}ms`,
+        );
+        movingPiece.style.setProperty(
+            "--accolade-reveal-delay",
+            `${revealDelay}ms`,
+        );
+        targetPiece.style.setProperty(
+            "--accolade-reveal-duration",
+            `${revealDuration}ms`,
+        );
+        targetPiece.style.setProperty(
+            "--accolade-reveal-delay",
+            `${revealDelay}ms`,
+        );
+        toSquare.append(targetPiece, movingPiece);
+        ghosts.push(targetPiece, movingPiece);
+    }
+
+    result.getBoundingClientRect();
+    window.requestAnimationFrame(() => {
+        result.classList.add("accolade-combine-active");
+        for (const ghost of ghosts)
+            ghost.classList.add("accolade-combine-active");
+    });
+
+    const cleanup = () => {
+        for (const ghost of ghosts) ghost.remove();
+        result.classList.remove(
+            "accolade-combine-result",
+            "accolade-combine-active",
+        );
+        result.style.removeProperty("--accolade-reveal-duration");
+        result.style.removeProperty("--accolade-reveal-delay");
+    };
+    const totalDuration = animateTravel ? fullDuration : revealDuration;
+    window.setTimeout(cleanup, totalDuration + 60);
 }
 
 function suppressMoveAnimation(boardID: number, move: Move): void {
@@ -955,10 +1104,20 @@ function playMoveSound(type: MoveType): void {
 }
 
 export function rememberLastMove(boardID: number, move: Move): void {
+    const chess = gs.room.game.matches[boardID]?.chess;
+    const fromPiece = chess?.getPiece(move.from);
+    const toPiece = chess?.getPiece(move.to);
+    const suppressTravel = shouldSuppressMoveAnimation(boardID, move);
+
     lastMoves.set(boardID, move);
+    lastMoveAnimationPieces.set(boardID, {
+        from: fromPiece ? { ...fromPiece } : undefined,
+        to: toPiece ? { ...toPiece } : undefined,
+        suppressTravel,
+    });
     const serial = nextMoveAnimationSerial++;
     lastMoveAnimationSerials.set(boardID, serial);
-    if (shouldSuppressMoveAnimation(boardID, move)) {
+    if (suppressTravel && !isAccoladeCombination(fromPiece, toPiece)) {
         animatedMoveSerials.set(boardID, serial);
         return;
     }
@@ -971,6 +1130,7 @@ export function clearLastMoves(): void {
     lastMoveAnimationSerials.clear();
     animatedMoveSerials.clear();
     suppressedMoveAnimations.clear();
+    lastMoveAnimationPieces.clear();
     closePromotionDialog();
 }
 

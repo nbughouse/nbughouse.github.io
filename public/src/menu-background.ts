@@ -3,10 +3,9 @@ import { sn } from "./session";
 import { boardThemes } from "./settings";
 
 const svgNamespace = "http://www.w3.org/2000/svg";
-const boardSymbolID = "menu-gallery-board-art";
-const boardClipID = "menu-gallery-board-clip";
 const pieceScale = 0.941;
 const pieceInset = (1 - pieceScale) / 2;
+let boardClipIndex = 0;
 const backRank = [
     "rook",
     "knight",
@@ -24,8 +23,6 @@ export function initMenuBackground(): void {
     const boardscape = document.querySelector<HTMLElement>("#menu-boardscape");
     if (!boardscape || boardscape.childElementCount > 0) return;
 
-    boardscape.append(createBoardDefinitions());
-
     const laneCount = 3;
     const boardsPerSequence = 3;
 
@@ -38,14 +35,10 @@ export function initMenuBackground(): void {
         const strip = document.createElement("div");
         strip.className = "menu-gallery-strip";
 
-        const sequence = document.createElement("div");
-        sequence.className = "menu-gallery-sequence";
-
-        for (let index = 0; index < boardsPerSequence; index++) {
-            sequence.append(createMenuBoardElement());
-        }
-
-        strip.append(sequence, sequence.cloneNode(true));
+        strip.append(
+            createBoardSequence(boardsPerSequence),
+            createBoardSequence(boardsPerSequence),
+        );
         lane.append(strip);
         boardscape.append(lane);
     }
@@ -54,38 +47,24 @@ export function initMenuBackground(): void {
 }
 
 export function refreshMenuBackground(): void {
-    const symbol = document.querySelector<SVGSymbolElement>(
-        `#${boardSymbolID}`,
-    );
-    if (!symbol) return;
-
-    symbol.replaceChildren();
-    appendBoardArtwork(symbol);
-    appendStartingPosition(symbol);
+    const pieceImages = getPieceImages();
+    for (const board of document.querySelectorAll<SVGSVGElement>(
+        ".menu-gallery-board",
+    )) {
+        board.replaceChildren();
+        const content = appendBoardClip(board);
+        appendBoardArtwork(content);
+        appendStartingPosition(content, pieceImages);
+    }
 }
 
-function createBoardDefinitions(): SVGSVGElement {
-    const svg = document.createElementNS(svgNamespace, "svg");
-    svg.classList.add("menu-gallery-definitions");
-    svg.setAttribute("aria-hidden", "true");
-
-    const definitions = document.createElementNS(svgNamespace, "defs");
-    const clipPath = document.createElementNS(svgNamespace, "clipPath");
-    clipPath.id = boardClipID;
-    clipPath.setAttribute("clipPathUnits", "userSpaceOnUse");
-
-    const clipRect = document.createElementNS(svgNamespace, "rect");
-    clipRect.setAttribute("width", "8");
-    clipRect.setAttribute("height", "8");
-    clipRect.setAttribute("rx", "0.18");
-    clipPath.append(clipRect);
-
-    const symbol = document.createElementNS(svgNamespace, "symbol");
-    symbol.id = boardSymbolID;
-    symbol.setAttribute("viewBox", "0 0 8 8");
-    definitions.append(clipPath, symbol);
-    svg.append(definitions);
-    return svg;
+function createBoardSequence(boardCount: number): HTMLDivElement {
+    const sequence = document.createElement("div");
+    sequence.className = "menu-gallery-sequence";
+    for (let index = 0; index < boardCount; index++) {
+        sequence.append(createMenuBoardElement());
+    }
+    return sequence;
 }
 
 function createMenuBoardElement(): SVGSVGElement {
@@ -94,15 +73,29 @@ function createMenuBoardElement(): SVGSVGElement {
     board.setAttribute("viewBox", "0 0 8 8");
     board.setAttribute("aria-hidden", "true");
     board.setAttribute("focusable", "false");
-
-    const use = document.createElementNS(svgNamespace, "use");
-    use.setAttribute("href", `#${boardSymbolID}`);
-    use.setAttribute("clip-path", `url(#${boardClipID})`);
-    board.append(use);
     return board;
 }
 
-function appendBoardArtwork(symbol: SVGSymbolElement): void {
+function appendBoardClip(board: SVGSVGElement): SVGGElement {
+    const clipID = `menu-gallery-board-clip-${boardClipIndex++}`;
+    const definitions = document.createElementNS(svgNamespace, "defs");
+    const clipPath = document.createElementNS(svgNamespace, "clipPath");
+    clipPath.id = clipID;
+
+    const clipRect = document.createElementNS(svgNamespace, "rect");
+    clipRect.setAttribute("width", "8");
+    clipRect.setAttribute("height", "8");
+    clipRect.setAttribute("rx", "0.18");
+    clipPath.append(clipRect);
+    definitions.append(clipPath);
+
+    const content = document.createElementNS(svgNamespace, "g");
+    content.setAttribute("clip-path", `url(#${clipID})`);
+    board.append(definitions, content);
+    return content;
+}
+
+function appendBoardArtwork(board: SVGGElement): void {
     const theme =
         boardThemes.find((current) => current.id === sn.settings.boardTheme) ||
         boardThemes[0];
@@ -113,7 +106,7 @@ function appendBoardArtwork(symbol: SVGSymbolElement): void {
         image.setAttribute("width", "8");
         image.setAttribute("height", "8");
         image.setAttribute("preserveAspectRatio", "none");
-        symbol.append(image);
+        board.append(image);
         return;
     }
 
@@ -134,29 +127,24 @@ function appendBoardArtwork(symbol: SVGSymbolElement): void {
                 : "";
         }).join(""),
     );
-    symbol.append(lightSquares, darkSquares);
+    board.append(lightSquares, darkSquares);
 }
 
-function appendStartingPosition(symbol: SVGSymbolElement): void {
-    const pieceImages = new Map<string, string>();
-    for (const color of ["white", "black"] as const) {
-        for (const type of pieceTypes) {
-            const href = getPieceImage(type, color);
-            if (href) pieceImages.set(`${type}-${color}`, href);
-        }
-    }
-
+function appendStartingPosition(
+    board: SVGGElement,
+    pieceImages: ReadonlyMap<string, string>,
+): void {
     for (let column = 0; column < 8; column++) {
         appendPiece(
-            symbol,
+            board,
             pieceImages.get(`${backRank[column]}-black`),
             0,
             column,
         );
-        appendPiece(symbol, pieceImages.get("pawn-black"), 1, column);
-        appendPiece(symbol, pieceImages.get("pawn-white"), 6, column);
+        appendPiece(board, pieceImages.get("pawn-black"), 1, column);
+        appendPiece(board, pieceImages.get("pawn-white"), 6, column);
         appendPiece(
-            symbol,
+            board,
             pieceImages.get(`${backRank[column]}-white`),
             7,
             column,
@@ -165,7 +153,7 @@ function appendStartingPosition(symbol: SVGSymbolElement): void {
 }
 
 function appendPiece(
-    symbol: SVGSymbolElement,
+    board: SVGGElement,
     href: string | undefined,
     row: number,
     column: number,
@@ -178,21 +166,25 @@ function appendPiece(
     image.setAttribute("y", (row + pieceInset).toString());
     image.setAttribute("width", pieceScale.toString());
     image.setAttribute("height", pieceScale.toString());
-    symbol.append(image);
+    image.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    board.append(image);
 }
 
-function getPieceImage(
-    type: PieceName,
-    color: "white" | "black",
-): string | undefined {
+function getPieceImages(): Map<string, string> {
+    const images = new Map<string, string>();
     const probe = document.createElement("div");
-    probe.className = `piece ${type} ${color}`;
     probe.classList.add("menu-piece-probe");
     document.body.append(probe);
 
-    const backgroundImage = getComputedStyle(probe).backgroundImage;
-    probe.remove();
+    for (const color of ["white", "black"] as const) {
+        for (const type of pieceTypes) {
+            probe.className = `menu-piece-probe piece ${type} ${color}`;
+            const backgroundImage = getComputedStyle(probe).backgroundImage;
+            const match = /^url\(["']?(.*?)["']?\)$/.exec(backgroundImage);
+            if (match) images.set(`${type}-${color}`, match[1]);
+        }
+    }
 
-    const match = /^url\(["']?(.*?)["']?\)$/.exec(backgroundImage);
-    return match?.[1];
+    probe.remove();
+    return images;
 }

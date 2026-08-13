@@ -403,6 +403,82 @@
    filter: none;
 }
 
+.piece.accolade-piece {
+   overflow: visible;
+}
+
+.piece .accolade-badge {
+   position: absolute;
+   right: -2%;
+   bottom: -2%;
+   box-sizing: border-box;
+   width: 42%;
+   height: 42%;
+   border: max(1px, calc(var(--square-size) * 0.025)) solid rgb(24 25 29 / 88%);
+   border-radius: 50%;
+   background-color: rgb(242 240 229 / 94%);
+   background-repeat: no-repeat;
+   background-position: center;
+   background-size: 88%;
+   box-shadow: 0 calc(var(--square-size) * 0.025) calc(var(--square-size) * 0.08) rgb(0 0 0 / 45%);
+   pointer-events: none;
+}
+
+.square > .piece.accolade-combine-layer {
+   position: absolute;
+   z-index: 5;
+   pointer-events: none;
+   will-change: transform, opacity;
+}
+
+.piece.accolade-combine-moving {
+   transform: translate(
+      var(--accolade-from-x),
+      var(--accolade-from-y)
+   );
+   transition:
+      transform var(--accolade-travel-duration) cubic-bezier(0.22, 0.72, 0.22, 1),
+      opacity var(--accolade-reveal-duration) ease-in var(--accolade-reveal-delay);
+}
+
+.piece.accolade-combine-target {
+   transition:
+      transform var(--accolade-reveal-duration) ease-in var(--accolade-reveal-delay),
+      opacity var(--accolade-reveal-duration) ease-in var(--accolade-reveal-delay);
+}
+
+.piece.accolade-combine-result {
+   opacity: 0;
+   transform: scale(0.86);
+   transition:
+      transform var(--accolade-reveal-duration) cubic-bezier(0.2, 0.9, 0.25, 1.2) var(--accolade-reveal-delay),
+      opacity var(--accolade-reveal-duration) ease-out var(--accolade-reveal-delay);
+}
+
+.piece.accolade-combine-result .accolade-badge {
+   transform: scale(0.25) rotate(-14deg);
+   transition: transform var(--accolade-reveal-duration) cubic-bezier(0.2, 0.9, 0.25, 1.35) var(--accolade-reveal-delay);
+}
+
+.piece.accolade-combine-moving.accolade-combine-active {
+   opacity: 0;
+   transform: translate(0, 0) scale(0.9);
+}
+
+.piece.accolade-combine-target.accolade-combine-active {
+   opacity: 0;
+   transform: scale(0.9);
+}
+
+.piece.accolade-combine-result.accolade-combine-active {
+   opacity: 1;
+   transform: scale(1);
+}
+
+.piece.accolade-combine-result.accolade-combine-active .accolade-badge {
+   transform: scale(1) rotate(0);
+}
+
 .piece.animating,
 .pocket-piece .piece.animating {
    z-index: 5;

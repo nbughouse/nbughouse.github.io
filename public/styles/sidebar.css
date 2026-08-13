@@ -500,7 +500,7 @@
 
 .room-variant-buttons {
    display: grid;
-   grid-template-columns: repeat(2, minmax(0, 1fr));
+   grid-template-columns: repeat(3, minmax(0, 1fr));
    align-content: start;
    gap: 1.25vh;
    min-height: 0;
@@ -528,6 +528,23 @@
    height: 2.8vh;
    object-fit: contain;
    filter: invert(1);
+}
+
+.room-variant-button .variant-accolade-icon {
+   position: relative;
+   width: 2.8vh;
+   height: 2.8vh;
+   background-repeat: no-repeat;
+   background-position: center;
+   background-size: contain;
+}
+
+.room-variant-button .variant-accolade-icon .accolade-badge {
+   right: -18%;
+   bottom: -12%;
+   width: 48%;
+   height: 48%;
+   border-width: 1px;
 }
 
 .room-variant-button[aria-pressed="true"] {

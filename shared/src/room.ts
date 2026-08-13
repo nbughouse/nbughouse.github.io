@@ -394,14 +394,14 @@ export class Game {
     getFinalChess(matchIndex: number): Chess {
         const chess = this.matches[matchIndex].chess.clone();
         for (const move of this.matches[matchIndex].queued.moves)
-            chess.doMove(move, true);
+            chess.doMove(move, true, this.getMoveRules());
 
         return chess;
     }
 
     doMove(matchIndex: number, move: Move): void {
         const match = this.matches[matchIndex];
-        const result = match.chess.doMove(move);
+        const result = match.chess.doMove(move, false, this.getMoveRules());
         this.moveResultEffects(matchIndex, move, result);
     }
 
@@ -413,6 +413,10 @@ export class Game {
         return {
             allowKingCapture: koedem,
             forcePocketKingDrop: koedem,
+            accolade: hasInitialBoardVariant(
+                this.config.initialBoard,
+                "accolade",
+            ),
         };
     }
 
@@ -430,10 +434,7 @@ export class Game {
                 )
                     continue;
 
-                this.matches[index].chess.addToPocket({
-                    type: result.captured.type,
-                    color: result.captured.color,
-                });
+                this.matches[index].chess.addToPocket(result.captured);
             }
         }
 

@@ -319,7 +319,11 @@
 								<option value="default">Default</option>
 								<option value="960">Chess960</option>
 								<option value="koedem">Koedem</option>
+								<option value="accolade">Accolade</option>
 								<option value="960+koedem">Chess960 + Koedem</option>
+								<option value="960+accolade">Chess960 + Accolade</option>
+								<option value="koedem+accolade">Koedem + Accolade</option>
+								<option value="960+koedem+accolade">Chess960 + Koedem + Accolade</option>
 								<option value="custom">Custom FEN</option>
 							</select>
 						</label>
@@ -369,6 +373,13 @@
 						aria-label="Koedem" title="Koedem">
 						<img src="/assets/img/chess-king.svg" alt="" aria-hidden="true" />
 						<span aria-hidden="true">Koedem</span>
+					</button>
+					<button class="room-variant-button" type="button" data-initial-board="accolade" aria-pressed="false"
+						aria-label="Accolade" title="Combine a knight with a bishop, rook, or queen">
+						<span class="variant-accolade-icon piece knight white" aria-hidden="true">
+							<span class="accolade-badge bishop white"></span>
+						</span>
+						<span aria-hidden="true">Accolade</span>
 					</button>
 				</div>
 				<div id="chat-messages">

@@ -13,6 +13,7 @@ export interface SerializedChess {
 export interface MoveRules {
     allowKingCapture?: boolean;
     forcePocketKingDrop?: boolean;
+    accolade?: boolean;
 }
 
 export class Chess {
@@ -135,6 +136,12 @@ export class Chess {
     }
 
     addToPocket(piece: Piece): void {
+        if (piece.combinedWith) {
+            this.addToPocket({ type: PieceType.KNIGHT, color: piece.color });
+            this.addToPocket({ type: piece.combinedWith, color: piece.color });
+            return;
+        }
+
         const pocket = this.getPocket(piece.color);
         const typeToAdd =
             piece.type === PieceType.PROMOTED_QUEEN
@@ -186,7 +193,9 @@ export class Chess {
         const piece = this.board[from.row][from.col];
         if (!piece) return false;
 
-        switch (piece.type) {
+        if (isKnightMove(from, to)) return pieceHasKnightMovement(piece);
+
+        switch (getNonKnightPieceType(piece)) {
             case PieceType.PAWN: {
                 const direction = piece.color ? -1 : 1;
                 return (
@@ -194,11 +203,8 @@ export class Chess {
                     to.row - from.row === direction
                 );
             }
-            case PieceType.KNIGHT: {
-                const dr = Math.abs(from.row - to.row);
-                const dc = Math.abs(from.col - to.col);
-                return (dr === 2 && dc === 1) || (dr === 1 && dc === 2);
-            }
+            case PieceType.KNIGHT:
+                return false;
             case PieceType.BISHOP: {
                 return this.isDiagonalPath(from, to);
             }
@@ -327,7 +333,9 @@ export class Chess {
         to: BoardPosition,
         premove: boolean,
     ): boolean {
-        switch (piece.type) {
+        if (isKnightMove(from, to)) return pieceHasKnightMovement(piece);
+
+        switch (getNonKnightPieceType(piece)) {
             case PieceType.PAWN: {
                 const direction = piece.color ? -1 : 1;
 
@@ -367,11 +375,8 @@ export class Chess {
                 return false;
             }
 
-            case PieceType.KNIGHT: {
-                const dr = Math.abs(from.row - to.row);
-                const dc = Math.abs(from.col - to.col);
-                return (dr === 2 && dc === 1) || (dr === 1 && dc === 2);
-            }
+            case PieceType.KNIGHT:
+                return false;
 
             case PieceType.BISHOP: {
                 const isDiagonal =
@@ -462,6 +467,14 @@ export class Chess {
         const captured = this.board[move.to.row][move.to.col];
 
         if (
+            rules.accolade &&
+            piece &&
+            captured &&
+            canCombinePieces(piece, captured)
+        )
+            return MoveType.NORMAL;
+
+        if (
             piece?.type === PieceType.KING &&
             Math.abs(move.from.col - move.to.col) === 2
         )
@@ -503,7 +516,12 @@ export class Chess {
         if (!premove) {
             if (this.turn !== piece.color) return false;
 
-            if (targetPiece && targetPiece.color === piece.color) return false;
+            if (
+                targetPiece &&
+                targetPiece.color === piece.color &&
+                !(rules.accolade && canCombinePieces(piece, targetPiece))
+            )
+                return false;
         }
 
         // Check if movement pattern is valid
@@ -526,7 +544,10 @@ export class Chess {
             this.board[captureRow][captureCol] = undefined;
         }
 
-        this.board[to.row][to.col] = piece;
+        this.board[to.row][to.col] =
+            rules.accolade && targetPiece
+                ? combinePieces(piece, targetPiece) ?? piece
+                : piece;
         this.board[from.row][from.col] = undefined;
 
         const inCheck = this.isInCheck(piece.color);
@@ -563,14 +584,22 @@ export class Chess {
 
         if (this.turn !== from.color) return false;
 
-        if (this.board[to.row][to.col]) return false;
+        const targetPiece = this.board[to.row][to.col];
+        const droppedPiece = { type: from.type, color: from.color };
+        if (
+            targetPiece &&
+            !(rules.accolade && canCombinePieces(droppedPiece, targetPiece))
+        )
+            return false;
         if (rules.allowKingCapture) return true;
 
-        this.board[to.row][to.col] = { type: from.type, color: from.color };
+        this.board[to.row][to.col] = targetPiece
+            ? combinePieces(droppedPiece, targetPiece)
+            : droppedPiece;
 
         const inCheck = this.isInCheck(from.color);
 
-        this.board[to.row][to.col] = undefined;
+        this.board[to.row][to.col] = targetPiece;
 
         return !inCheck;
     }
@@ -594,17 +623,22 @@ export class Chess {
             : this.isLegalMove(move.from, move.to, premove, rules);
     }
 
-    doMove(move: Move, premove = false): MoveResult {
+    doMove(move: Move, premove = false, rules: MoveRules = {}): MoveResult {
         if (move.to.loc === "pocket") return {};
 
         const from = move.from;
         const to = move.to;
 
         if (from.loc === "pocket") {
-            this.board[to.row][to.col] = {
+            const droppedPiece: Piece = {
                 type: from.type,
                 color: from.color,
             };
+            const targetPiece = this.board[to.row][to.col];
+            this.board[to.row][to.col] =
+                rules.accolade && targetPiece
+                    ? combinePieces(droppedPiece, targetPiece) ?? droppedPiece
+                    : droppedPiece;
 
             this.removeFromPocket(from.type, from.color);
             this.enPassantTarget = undefined;
@@ -616,13 +650,20 @@ export class Chess {
         const piece = this.board[from.row][from.col];
         if (!piece) return {};
 
+        const targetPiece = this.board[to.row][to.col];
+        const combining =
+            rules.accolade && targetPiece
+                ? canCombinePieces(piece, targetPiece)
+                : false;
         let captured =
-            this.board[to.row][to.col]?.type === PieceType.PROMOTED_QUEEN
+            targetPiece?.type === PieceType.PROMOTED_QUEEN
                 ? {
                       type: PieceType.PAWN,
-                      color: piece.color,
+                      color: targetPiece.color,
                   }
-                : this.board[to.row][to.col];
+                : combining
+                  ? undefined
+                  : targetPiece;
 
         // Handle en passant capture
         if (piece.type === PieceType.PAWN && this.isEnPassantMove(from, to)) {
@@ -653,7 +694,10 @@ export class Chess {
             this.board[row][rookFromCol] = undefined;
         } else {
             // Normal move
-            this.board[to.row][to.col] = piece;
+            this.board[to.row][to.col] =
+                combining && targetPiece
+                    ? combinePieces(piece, targetPiece)
+                    : piece;
             this.board[from.row][from.col] = undefined;
         }
 
@@ -841,6 +885,8 @@ export enum PieceType {
 export interface Piece {
     type: PieceType;
     color: Color;
+    /** Original non-knight component of an Accolade combined piece. */
+    combinedWith?: PieceType;
 }
 
 export type Board = (Piece | undefined)[][];
@@ -922,4 +968,48 @@ export enum MoveType {
 export enum CastleMove {
     LONG = "long",
     SHORT = "short",
+}
+
+const accoladePartnerTypes = new Set<PieceType>([
+    PieceType.BISHOP,
+    PieceType.ROOK,
+    PieceType.QUEEN,
+    PieceType.PROMOTED_QUEEN,
+]);
+
+function canCombinePieces(first: Piece, second: Piece): boolean {
+    if (first.color !== second.color) return false;
+    if (first.combinedWith || second.combinedWith) return false;
+
+    return (
+        (first.type === PieceType.KNIGHT &&
+            accoladePartnerTypes.has(second.type)) ||
+        (second.type === PieceType.KNIGHT &&
+            accoladePartnerTypes.has(first.type))
+    );
+}
+
+function combinePieces(first: Piece, second: Piece): Piece | undefined {
+    if (!canCombinePieces(first, second)) return undefined;
+    const partner =
+        first.type === PieceType.KNIGHT ? second.type : first.type;
+    return {
+        type: PieceType.KNIGHT,
+        color: first.color,
+        combinedWith: partner,
+    };
+}
+
+function pieceHasKnightMovement(piece: Piece): boolean {
+    return piece.type === PieceType.KNIGHT || piece.combinedWith !== undefined;
+}
+
+function getNonKnightPieceType(piece: Piece): PieceType {
+    return piece.combinedWith ?? piece.type;
+}
+
+function isKnightMove(from: BoardPosition, to: BoardPosition): boolean {
+    const dr = Math.abs(from.row - to.row);
+    const dc = Math.abs(from.col - to.col);
+    return (dr === 2 && dc === 1) || (dr === 1 && dc === 2);
 }
