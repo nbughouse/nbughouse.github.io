@@ -74,7 +74,7 @@ function formatTime(time: number): string {
 }
 
 function formatTimeDifference(time: number): string {
-    const sign = time >= 0 ? "+" : "-";
+    const sign = time > 0 ? "+" : time < 0 ? "-" : "";
     return `${sign}${formatTime(Math.abs(time))}`;
 }
 
