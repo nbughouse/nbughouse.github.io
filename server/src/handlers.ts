@@ -4,6 +4,7 @@ import { getPlayerDisplayName, Player, PlayerStatus } from "@shared/player";
 import { Room, RoomStatus, Team } from "@shared/room";
 import type { GameSocket } from "./index";
 import { io, profiles, rooms } from "./index";
+import { recordCompletedGame } from "./stats-store";
 
 export function setupHandlers(socket: GameSocket): void {
     socket.on("ping", () => {
@@ -185,6 +186,7 @@ export function setupHandlers(socket: GameSocket): void {
 
         const kingWinner = socket.room.game.checkKingAccumulation();
         if (kingWinner) {
+            recordCompletedGame(socket.room);
             socket.room.endRoom(kingWinner);
             io.to(socket.room.code).emit(
                 "ended-room",
@@ -200,6 +202,7 @@ export function setupHandlers(socket: GameSocket): void {
             const winner = board.getPlayer(color);
             if (!winner) return;
 
+            recordCompletedGame(socket.room);
             socket.room.endRoom(winningTeam);
             io.to(socket.room.code).emit(
                 "ended-room",
@@ -276,6 +279,7 @@ export function setupHandlers(socket: GameSocket): void {
 
         const winningTeam = playerTeam === Team.BLUE ? Team.RED : Team.BLUE;
 
+        recordCompletedGame(socket.room);
         socket.room.endRoom(winningTeam);
         io.to(socket.room.code).emit(
             "ended-room",

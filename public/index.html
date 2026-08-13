@@ -41,6 +41,7 @@
 						<div class="form-group">
 							<button id="setting-btn" class="util-btns" aria-label="Settings"></button>
 							<button id="info-btn" class="util-btns" aria-label="Info"></button>
+							<button id="stats-btn" class="util-btns" aria-label="Stats"></button>
 							<a id="github-btn" class="util-btns button-3d" href="https://github.com/nbughouse/nbughouse"
 								target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" draggable="false">
 								<svg viewBox="0 0 98 96" aria-hidden="true" focusable="false" draggable="false">
@@ -119,6 +120,50 @@
 								rel="noopener noreferrer" draggable="false">
 								View GitHub repository
 							</a>
+						</div>
+					</div>
+					<div id="stats-section" class="menu-view hidden">
+						<div class="menu-view-topbar">
+							<button id="back-from-stats-btn" class="open-arrow" type="button"
+								aria-label="Back">←</button>
+						</div>
+						<div id="stats-content">
+							<section class="stats-hero">
+								<div>
+									<strong id="stats-unique-players">Unavailable</strong>
+									<span>unique players</span>
+								</div>
+								<div>
+									<strong id="stats-completed-games">Unavailable</strong>
+									<span>completed games</span>
+								</div>
+							</section>
+							<section class="help-block">
+								<h2>Stats</h2>
+								<p>
+									Statistics are generated from append-only production server records.
+									Unique players are counted using account IDs or anonymous
+									persistent IDs; bots and incomplete games are excluded.
+								</p>
+							</section>
+							<section class="help-block">
+								<h3>Evidence</h3>
+								<ul>
+									<li>Gameplay counts come from server-recorded player and completed-game events.</li>
+									<li>Traffic metrics should come from a third-party analytics provider, such as Cloudflare Web Analytics, Google Analytics, or Plausible.</li>
+									<li id="stats-updated-at">Verified gameplay totals appear only when derived server-side stats are configured.</li>
+									<li>Keep the project open source on GitHub when practical, and expose a public aggregate API or timestamped dashboard for gameplay counts.</li>
+								</ul>
+							</section>
+							<section class="help-block">
+								<h3>Definitions</h3>
+								<p>
+									Claims use rounded counts because plausible, consistently
+									defined numbers are stronger than suspiciously precise totals.
+									Completed multiplayer games are concrete product events and
+									are less likely to be inflated by refreshes, crawlers, or testing.
+								</p>
+							</section>
 						</div>
 					</div>
 					<div id="menu-settings-section" class="menu-view hidden">

@@ -20,7 +20,18 @@ jobs:
                       set -e
 
                       APP_DIR=/opt/BughouseNPlayer
+                      DATA_DIR=/opt/BughouseNPlayer-data
+                      STATS_FILE="$DATA_DIR/stats-events.jsonl"
                       REPO_URL=https://github.com/${{ github.repository }}.git
+
+                      sudo mkdir -p "$DATA_DIR"
+                      if [ ! -e "$STATS_FILE" ]; then
+                          sudo install -m 600 /dev/null "$STATS_FILE"
+                      fi
+                      sudo chmod 600 "$STATS_FILE" || true
+                      if command -v chattr >/dev/null 2>&1; then
+                          sudo chattr +a "$STATS_FILE" || true
+                      fi
 
                       if [ -e "$APP_DIR" ] && [ ! -d "$APP_DIR/.git" ]; then
                           BACKUP_DIR="${APP_DIR}.backup.$(date +%Y%m%d%H%M%S)"

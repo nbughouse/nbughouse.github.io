@@ -9,6 +9,9 @@ services:
             HOST: 0.0.0.0
             PORT: 8000
             FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-https://nbughouse.github.io}
+            BUGHOUSE_STATS_EVENTS_FILE: /app/data/stats-events.jsonl
+        volumes:
+            - /opt/BughouseNPlayer-data:/app/data
         expose:
             - "8000"
         networks:

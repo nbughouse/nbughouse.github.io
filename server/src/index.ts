@@ -10,6 +10,11 @@ import type { Room } from "@shared/room";
 import { RoomStatus, Team } from "@shared/room";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+    getSiteStats,
+    recordCompletedGame,
+    recordPlayerSeen,
+} from "./stats-store";
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -65,6 +70,10 @@ app.get("/api/rooms/:roomCode", (request, response) => {
     response.json({ exists: rooms.has(roomCode) });
 });
 
+app.get("/api/stats", (_request, response) => {
+    response.json(getSiteStats());
+});
+
 if (shouldUseDevClient && !hasBuiltClient) {
     const { createServer } = await import("vite");
     const vite = await createServer({
@@ -117,6 +126,7 @@ io.on("connection", (socket: Socket) => {
         const profile = profiles.get(handshakePlayerID);
         if (profile && profile.auth === handshakeToken) {
             gameSocket.player = new Player(handshakePlayerID, profile.name);
+            recordPlayerSeen(handshakePlayerID);
             profile.name = gameSocket.player.name;
             gameSocket.emit("sent-player", gameSocket.player.name);
         } else {
@@ -154,6 +164,7 @@ setInterval(() => {
             if (timeout) {
                 const winningTeam =
                     timeout.team === Team.BLUE ? Team.RED : Team.BLUE;
+                recordCompletedGame(room);
                 room.endRoom(winningTeam);
                 io.to(code).emit(
                     "ended-room",
@@ -185,6 +196,7 @@ function issueFreshProfile(socket: GameSocket): void {
 
     socket.player = player;
     profiles.set(id, { name: player.name, id, auth });
+    recordPlayerSeen(id);
     socket.emit("created-player", id, auth);
 }
 

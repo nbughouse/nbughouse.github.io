@@ -118,6 +118,7 @@ Backend variables:
 | `PORT` | `8000` | Backend listen port. |
 | `FRONTEND_ORIGIN` | `https://nbughouse.github.io` | Primary allowed browser origin for Socket.IO CORS. |
 | `ALLOWED_ORIGINS` | unset | Optional comma-separated extra allowed origins. |
+| `BUGHOUSE_STATS_EVENTS_FILE` | unset locally, `/app/data/stats-events.jsonl` in Docker | Append-only server event log used to derive public stats. |
 
 ## Deployment
 
@@ -152,6 +153,17 @@ The workflow SSHes into the VM, keeps the checkout under
 ```bash
 docker compose up -d --build --remove-orphans
 ```
+
+Stats are persisted outside the Git checkout at:
+
+```text
+/opt/BughouseNPlayer-data/stats-events.jsonl
+```
+
+That file is bind-mounted into the container at `/app/data/stats-events.jsonl`.
+The deploy workflow creates it before rebuilding and marks it append-only with
+`chattr +a` when the VM filesystem supports it, so repo updates and container
+rebuilds do not reset public gameplay totals.
 
 If `/opt/BughouseNPlayer` already exists but is not a Git checkout, the workflow
 moves it aside as `/opt/BughouseNPlayer.backup.<timestamp>` before cloning.

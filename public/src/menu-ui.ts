@@ -5,6 +5,7 @@ import { setStoredProfileValue, sn } from "./session";
 import { getBasePath } from "./app-paths";
 import { applyAllChessSettings } from "./chess-ui";
 import { initMenuBackground } from "./menu-background";
+import { fetchSiteStats, type SiteStats } from "./stats-api";
 import {
     boardThemes,
     pieceThemes,
@@ -29,7 +30,7 @@ let menuErrorFadeTimeout: number | undefined;
 let menuErrorClearTimeout: number | undefined;
 const SERVER_CHECK_TIMEOUT_MS = 3500;
 
-type MenuView = "main" | "join" | "name" | "help" | "settings";
+type MenuView = "main" | "join" | "name" | "help" | "stats" | "settings";
 
 interface BughouseHistoryState {
     bughouseView?: "menu" | "game";
@@ -52,6 +53,7 @@ export function initMenuControls(): void {
         "#setting-btn",
     ) as HTMLButtonElement;
     const infoButton = document.querySelector("#info-btn") as HTMLButtonElement;
+    const statsButton = document.querySelector("#stats-btn") as HTMLButtonElement;
 
     // Handle create game button
     createGameButton.addEventListener("click", async () => {
@@ -72,6 +74,10 @@ export function initMenuControls(): void {
 
     infoButton.addEventListener("click", () => {
         showHelpView();
+    });
+
+    statsButton.addEventListener("click", () => {
+        showStatsView();
     });
 
     settingsButton.addEventListener("click", () => {
@@ -99,6 +105,7 @@ export function initMenuControls(): void {
     setupActionNameView();
     setupJoinView();
     setupHelpView();
+    setupStatsView();
     setupSettingsView();
 }
 
@@ -226,6 +233,16 @@ function setupJoinView(): void {
 function setupHelpView(): void {
     const backButton = document.querySelector(
         "#back-from-help-btn",
+    ) as HTMLButtonElement;
+
+    backButton.addEventListener("click", () => {
+        navigateBackToMainMenu();
+    });
+}
+
+function setupStatsView(): void {
+    const backButton = document.querySelector(
+        "#back-from-stats-btn",
     ) as HTMLButtonElement;
 
     backButton.addEventListener("click", () => {
@@ -465,6 +482,7 @@ function showJoinView(updateHistory = true): void {
     const joinSection = document.querySelector("#join-section");
     const nameSection = document.querySelector("#name-section");
     const helpSection = document.querySelector("#help-section");
+    const statsSection = document.querySelector("#stats-section");
     const settingsSection = document.querySelector("#menu-settings-section");
     const codeInput = document.querySelector(
         "#join-room-code-input",
@@ -476,10 +494,12 @@ function showJoinView(updateHistory = true): void {
     menuShell?.classList.add("join-mode");
     menuShell?.classList.remove("name-mode");
     menuShell?.classList.remove("help-mode");
+    menuShell?.classList.remove("stats-mode");
     menuShell?.classList.remove("settings-mode");
     mainSection?.classList.add("hidden");
     nameSection?.classList.add("hidden");
     helpSection?.classList.add("hidden");
+    statsSection?.classList.add("hidden");
     settingsSection?.classList.add("hidden");
     joinSection?.classList.remove("hidden");
 
@@ -496,6 +516,7 @@ function showActionNameView(updateHistory = true): void {
     const joinSection = document.querySelector("#join-section");
     const nameSection = document.querySelector("#name-section");
     const helpSection = document.querySelector("#help-section");
+    const statsSection = document.querySelector("#stats-section");
     const settingsSection = document.querySelector("#menu-settings-section");
     const nameInput = document.querySelector(
         "#action-player-name-input",
@@ -504,10 +525,12 @@ function showActionNameView(updateHistory = true): void {
     menuShell?.classList.add("name-mode");
     menuShell?.classList.remove("join-mode");
     menuShell?.classList.remove("help-mode");
+    menuShell?.classList.remove("stats-mode");
     menuShell?.classList.remove("settings-mode");
     mainSection?.classList.add("hidden");
     joinSection?.classList.add("hidden");
     helpSection?.classList.add("hidden");
+    statsSection?.classList.add("hidden");
     settingsSection?.classList.add("hidden");
     nameSection?.classList.remove("hidden");
 
@@ -523,19 +546,82 @@ function showHelpView(updateHistory = true): void {
     const joinSection = document.querySelector("#join-section");
     const nameSection = document.querySelector("#name-section");
     const helpSection = document.querySelector("#help-section");
+    const statsSection = document.querySelector("#stats-section");
     const settingsSection = document.querySelector("#menu-settings-section");
 
     menuShell?.classList.add("help-mode");
     menuShell?.classList.remove("join-mode");
     menuShell?.classList.remove("name-mode");
+    menuShell?.classList.remove("stats-mode");
     menuShell?.classList.remove("settings-mode");
     mainSection?.classList.add("hidden");
     joinSection?.classList.add("hidden");
     nameSection?.classList.add("hidden");
+    statsSection?.classList.add("hidden");
     settingsSection?.classList.add("hidden");
     helpSection?.classList.remove("hidden");
     setMenuView("help", updateHistory);
     clearErrors();
+}
+
+function showStatsView(updateHistory = true): void {
+    const menuShell = document.querySelector("#menu-shell");
+    const mainSection = document.querySelector("#section");
+    const joinSection = document.querySelector("#join-section");
+    const nameSection = document.querySelector("#name-section");
+    const helpSection = document.querySelector("#help-section");
+    const statsSection = document.querySelector("#stats-section");
+    const settingsSection = document.querySelector("#menu-settings-section");
+
+    menuShell?.classList.add("stats-mode");
+    menuShell?.classList.remove("join-mode");
+    menuShell?.classList.remove("name-mode");
+    menuShell?.classList.remove("help-mode");
+    menuShell?.classList.remove("settings-mode");
+    mainSection?.classList.add("hidden");
+    joinSection?.classList.add("hidden");
+    nameSection?.classList.add("hidden");
+    helpSection?.classList.add("hidden");
+    settingsSection?.classList.add("hidden");
+    statsSection?.classList.remove("hidden");
+    setMenuView("stats", updateHistory);
+    void updateStatsView();
+    clearErrors();
+}
+
+async function updateStatsView(): Promise<void> {
+    const stats = await fetchSiteStats();
+    if (!stats) return;
+
+    setStatsText("#stats-unique-players", stats.uniquePlayers);
+    setStatsText("#stats-completed-games", stats.completedGames);
+    updateStatsUpdatedAt(stats);
+}
+
+function setStatsText(selector: string, value: number | undefined): void {
+    const element = document.querySelector(selector);
+    if (element && Number.isFinite(value)) {
+        element.textContent = formatRoundedCount(value);
+    }
+}
+
+function updateStatsUpdatedAt(stats: SiteStats): void {
+    if (!stats.updatedAt) return;
+
+    const element = document.querySelector("#stats-updated-at");
+    if (!element) return;
+
+    element.textContent = `Gameplay totals are derived from server-recorded events. Last event: ${stats.updatedAt}.`;
+}
+
+function formatRoundedCount(value: number | undefined): string {
+    if (!Number.isFinite(value)) return "";
+
+    const count = Math.max(0, Math.floor(value));
+    const rounded =
+        count >= 1000 ? Math.floor(count / 100) * 100 : Math.floor(count / 10) * 10;
+
+    return `${rounded.toLocaleString()}+`;
 }
 
 function showSettingsView(updateHistory = true): void {
@@ -544,16 +630,19 @@ function showSettingsView(updateHistory = true): void {
     const joinSection = document.querySelector("#join-section");
     const nameSection = document.querySelector("#name-section");
     const helpSection = document.querySelector("#help-section");
+    const statsSection = document.querySelector("#stats-section");
     const settingsSection = document.querySelector("#menu-settings-section");
 
     menuShell?.classList.add("settings-mode");
     menuShell?.classList.remove("join-mode");
     menuShell?.classList.remove("name-mode");
     menuShell?.classList.remove("help-mode");
+    menuShell?.classList.remove("stats-mode");
     mainSection?.classList.add("hidden");
     joinSection?.classList.add("hidden");
     nameSection?.classList.add("hidden");
     helpSection?.classList.add("hidden");
+    statsSection?.classList.add("hidden");
     settingsSection?.classList.remove("hidden");
     setMenuView("settings", updateHistory);
     updateMenuSettingsUI();
@@ -566,6 +655,7 @@ function showMainMenuView(updateHistory = true): void {
     const joinSection = document.querySelector("#join-section");
     const nameSection = document.querySelector("#name-section");
     const helpSection = document.querySelector("#help-section");
+    const statsSection = document.querySelector("#stats-section");
     const settingsSection = document.querySelector("#menu-settings-section");
     const codeInput = document.querySelector(
         "#join-room-code-input",
@@ -574,10 +664,12 @@ function showMainMenuView(updateHistory = true): void {
     menuShell?.classList.remove("join-mode");
     menuShell?.classList.remove("name-mode");
     menuShell?.classList.remove("help-mode");
+    menuShell?.classList.remove("stats-mode");
     menuShell?.classList.remove("settings-mode");
     joinSection?.classList.add("hidden");
     nameSection?.classList.add("hidden");
     helpSection?.classList.add("hidden");
+    statsSection?.classList.add("hidden");
     settingsSection?.classList.add("hidden");
     mainSection?.classList.remove("hidden");
     codeInput.value = "";
@@ -598,6 +690,11 @@ function showMenuView(view: MenuView, updateHistory = true): void {
 
     if (view === "help") {
         showHelpView(updateHistory);
+        return;
+    }
+
+    if (view === "stats") {
+        showStatsView(updateHistory);
         return;
     }
 
