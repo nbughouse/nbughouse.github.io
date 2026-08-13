@@ -8,7 +8,7 @@ services:
             NODE_ENV: production
             HOST: 0.0.0.0
             PORT: 8000
-            FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-https://nbughouse.github.io}
+            FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-https://nbug.app}
             BUGHOUSE_STATS_EVENTS_FILE: /app/data/stats-events.jsonl
         volumes:
             - /opt/BughouseNPlayer-data:/app/data

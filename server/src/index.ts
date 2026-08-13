@@ -97,7 +97,7 @@ if (shouldUseDevClient && !hasBuiltClient) {
     app.use(express.static(publicPath));
 } else {
     app.get("/", (_request, response) => {
-        response.send("Bughouse N Player backend is running. Frontend is hosted separately.");
+        response.send("Bughouse N Player backend is running. Frontend is not built.");
     });
 }
 
@@ -107,7 +107,7 @@ app.get("/games/:roomCode", (request, response) => {
         return response.status(404).send("Invalid room code format");
 
     if (!shouldUseDevClient && !hasBuiltClient) {
-        return response.status(404).send("Frontend is hosted separately");
+        return response.status(404).send("Frontend is not built");
     }
 
     response.sendFile("index.html", { root: publicPath });
@@ -218,6 +218,7 @@ function isHttpOriginAllowed(origin: string | undefined): boolean {
 
 function getAllowedOrigins(): Set<string> {
     const origins = new Set([
+        "https://nbug.app",
         "https://nbughouse.github.io",
         "https://nbughouse.duckdns.org",
         `http://localhost:${config.clientPort}`,
