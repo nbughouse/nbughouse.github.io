@@ -611,7 +611,27 @@ function updateStatsUpdatedAt(stats: SiteStats): void {
     const element = document.querySelector("#stats-updated-at");
     if (!element) return;
 
-    element.textContent = `Gameplay totals are derived from server-recorded events. Last event: ${stats.updatedAt}.`;
+    element.textContent = `Last recorded event: ${formatStatsTimestamp(stats.updatedAt)}`;
+}
+
+function formatStatsTimestamp(timestamp: string): string {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return timestamp;
+
+    const datePart = new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+    }).format(date);
+    const timePart = new Intl.DateTimeFormat("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "UTC",
+    }).format(date);
+
+    return `${datePart}, ${timePart} UTC`;
 }
 
 function formatRoundedCount(value: number | undefined): string {

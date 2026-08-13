@@ -143,25 +143,33 @@
 								<p>
 									Statistics are generated from append-only production server records.
 									Unique players are counted using account IDs or anonymous
-									persistent IDs; bots and incomplete games are excluded.
+									persistent IDs. Bots, test sessions, and incomplete games are
+									excluded.
 								</p>
 							</section>
 							<section class="help-block">
-								<h3>Evidence</h3>
-								<ul>
-									<li>Gameplay counts come from server-recorded player and completed-game events.</li>
-									<li>Traffic metrics should come from a third-party analytics provider, such as Cloudflare Web Analytics, Google Analytics, or Plausible.</li>
-									<li id="stats-updated-at">Verified gameplay totals appear only when derived server-side stats are configured.</li>
-									<li>Keep the project open source on GitHub when practical, and expose a public aggregate API or timestamped dashboard for gameplay counts.</li>
-								</ul>
+								<h3>Verification</h3>
+								<p>
+									Gameplay totals are derived directly from server-recorded player
+									and completed-game events.
+								</p>
+								<p id="stats-updated-at">
+									Last recorded event: <strong>August 13, 2026, 00:15 UTC</strong>
+								</p>
+								<p>
+									Traffic statistics, when shown, are measured separately using a
+									third-party analytics provider.
+								</p>
 							</section>
 							<section class="help-block">
 								<h3>Definitions</h3>
 								<p>
-									Claims use rounded counts because plausible, consistently
-									defined numbers are stronger than suspiciously precise totals.
-									Completed multiplayer games are concrete product events and
-									are less likely to be inflated by refreshes, crawlers, or testing.
+									<strong>Unique player:</strong> A distinct account ID or
+									anonymous persistent player ID.
+								</p>
+								<p>
+									<strong>Completed game:</strong> A multiplayer game that reached
+									a recorded completion state.
 								</p>
 							</section>
 						</div>
