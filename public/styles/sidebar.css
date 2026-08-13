@@ -510,19 +510,28 @@
    --button-color: var(--surface);
 
    display: flex;
+   flex-direction: column;
    align-items: center;
    justify-content: center;
+   gap: 0.65vh;
    width: 100%;
    min-width: 0;
    height: 7.25vh;
-   padding: 1vh;
+   padding: 0.85vh;
    font-weight: 800;
-   font-size: 2vh;
+   font-size: 1.45vh;
    line-height: 1;
 }
 
+.room-variant-button img {
+   width: 2.8vh;
+   height: 2.8vh;
+   object-fit: contain;
+   filter: invert(1);
+}
+
 .room-variant-button[aria-pressed="true"] {
-   --button-color: var(--green);
+   --button-color: var(--blue);
    color: var(--text);
 }
 

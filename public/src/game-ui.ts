@@ -292,7 +292,9 @@ function setMoreRoomSettingsOpen(open: boolean): void {
 }
 
 function setRoomVariantsOpen(open: boolean): void {
-    const variantsButton = document.querySelector("#room-variants-btn");
+    const variantsButton = document.querySelector(
+        "#room-variants-btn",
+    ) as HTMLButtonElement | null;
     const variantButtonsPanel = document.querySelector("#room-variant-buttons");
     const chatMessages = document.querySelector("#chat-messages");
     const chatSection = document.querySelector("#chat-section");
@@ -301,6 +303,12 @@ function setRoomVariantsOpen(open: boolean): void {
     chatMessages?.classList.toggle("hidden", open);
     chatSection?.classList.toggle("variants-open", open);
     variantsButton?.setAttribute("aria-expanded", open.toString());
+    if (variantsButton) {
+        const label = open ? "Hide Variants" : "Show Variants";
+        variantsButton.textContent = label;
+        variantsButton.setAttribute("aria-label", label);
+        variantsButton.title = label;
+    }
 }
 
 function queueRoomSettingsSave(): void {
