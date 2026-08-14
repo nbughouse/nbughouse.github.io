@@ -545,10 +545,10 @@ export function updateRoomSettingsUI(): void {
         timeSharedInput,
         initialBoardFenInput,
         pawnDropRanksInput,
-        variantsButton,
         ...variantButtons,
     ])
         element.disabled = !editable;
+    variantsButton.disabled = false;
     for (const select of [
         timeTypeSelect,
         initialBoardModeSelect,
