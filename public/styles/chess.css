@@ -352,8 +352,7 @@
 }
 
 .square.legal-move.has-piece:hover::after {
-   width: 95%;
-   height: 95%;
+   background-color: rgba(28, 26, 23, 0.1);
 }
 
 /* Board Labels */

@@ -798,7 +798,7 @@ function animateAccoladeCombination(
     window.setTimeout(cleanup, totalDuration + 60);
 }
 
-function suppressMoveAnimation(boardID: number, move: Move): void {
+export function suppressMoveAnimation(boardID: number, move: Move): void {
     const suppressedMoves = suppressedMoveAnimations.get(boardID) || [];
     suppressedMoves.push(getMoveAnimationKey(move));
     suppressedMoveAnimations.set(boardID, suppressedMoves);

@@ -22,7 +22,11 @@ import {
     getPlayerPlaqueAppearance,
 } from "./game-ui";
 import { showError, showMenuScreen } from "./menu-ui";
-import { clearLastMoves, rememberLastMove } from "./chess-ui";
+import {
+    clearLastMoves,
+    rememberLastMove,
+    suppressMoveAnimation,
+} from "./chess-ui";
 import {
     startTimeUpdates,
     stopTimeUpdates,
@@ -193,6 +197,7 @@ export function initGameSocket(): void {
                     gs.room.game.getMoveRules(),
                 )
             ) {
+                suppressMoveAnimation(boardID, currentMatch.queued.moves[0]);
                 gs.socket.emit(
                     "move-board",
                     boardID,
