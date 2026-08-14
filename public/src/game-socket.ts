@@ -17,11 +17,13 @@ import {
 } from "./game-ui";
 import {
     updateUIAllChat,
+    updateUIPushChat,
+    getPlayerPlaqueAppearance,
+} from "./chat-ui";
+import {
     updateStartButton,
     updateRoomSettingsUI,
     updateUIPlayerList,
-    updateUIPushChat,
-    getPlayerPlaqueAppearance,
 } from "./sidebar-ui";
 import { showError, showMenuScreen } from "./menu-ui";
 import {
