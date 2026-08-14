@@ -295,6 +295,7 @@ export function createBoardElement(id: number): HTMLDivElement {
 }
 
 export function applyAllChessSettings(): void {
+    applyPieceAnimationSpeed();
     applyPieceTheme();
     for (const board of document.querySelectorAll(".board"))
         applyBoardTheme(board as HTMLElement);
@@ -303,6 +304,15 @@ export function applyAllChessSettings(): void {
         for (let index = 0; index < gs.room.game.matches.length; index++)
             updateUIChess(index);
     }
+}
+
+export function applyPieceAnimationSpeed(): void {
+    const speed = gs.settings.pieceAnimationSpeed;
+    const duration = speed > 0 ? Math.round(300 / speed) : 0;
+    document.documentElement.style.setProperty(
+        "--piece-animation-duration",
+        `${duration}ms`,
+    );
 }
 
 function applyPieceTheme(): void {

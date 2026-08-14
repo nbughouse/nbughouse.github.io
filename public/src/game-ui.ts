@@ -811,7 +811,7 @@ export function updateStartButton(): void {
         readyButton.disabled = false;
         readyButton.classList.remove("waiting");
     } else {
-        readyButton.textContent = "Waiting for host...";
+        readyButton.textContent = "Waiting for start...";
         readyButton.disabled = true;
         readyButton.classList.add("waiting");
     }
@@ -1444,7 +1444,10 @@ function updateGridLayout(): void {
             dualBoardPrimaryID = controlledBoardID ?? 0;
         }
 
-        const secondaryScale = controlledBoardIDs.length === 2 ? 1 : 0.8;
+        // Only emphasize a board when this player controls exactly one of
+        // them. Spectators control neither board, so both boards should get
+        // the same amount of space.
+        const secondaryScale = controlledBoardIDs.length === 1 ? 0.8 : 1;
         const normalWidth = Math.max(
             0,
             Math.min(
@@ -1578,4 +1581,5 @@ export function endGameUI(): void {
     updateUIAllGame();
     updateUIPlayerList();
     updateRoomSettingsUI();
+    refreshDualBoardLayout();
 }

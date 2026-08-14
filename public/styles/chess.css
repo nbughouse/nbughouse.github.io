@@ -339,20 +339,34 @@
    opacity: 1;
 }
 
+.square.legal-move:not(.has-piece)::after {
+   transition:
+      width var(--piece-animation-duration, 300ms) cubic-bezier(0.2, 0, 0, 1),
+      height var(--piece-animation-duration, 300ms) cubic-bezier(0.2, 0, 0, 1);
+}
+
 .square.legal-move:hover::after {
    width: 40%;
    height: 40%;
 }
 
 .square.legal-move.has-piece::after {
+   box-sizing: border-box;
    border: calc(var(--square-size) * 0.06) solid rgba(28, 26, 23, 0.18);
    background-color: transparent;
    width: 90%;
    height: 90%;
+   transition: border-width var(--piece-animation-duration, 300ms) cubic-bezier(0.2, 0, 0, 1);
 }
 
 .square.legal-move.has-piece:hover::after {
-   background-color: rgba(28, 26, 23, 0.1);
+   border-width: calc(var(--square-size) * 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+   .square.legal-move::after {
+      transition-duration: 0ms;
+   }
 }
 
 /* Board Labels */

@@ -131,6 +131,7 @@ export function initGameSocket(): void {
         updateUIPlayerList();
         updateUIAllPlayers();
         updateStartButton();
+        refreshDualBoardLayout();
     });
 
     gs.socket.on("room-settings-updated", (raw: SerializedGame) => {
@@ -146,6 +147,7 @@ export function initGameSocket(): void {
         updateUIPlayerList();
         updateUIAllChat();
         updateRoomSettingsUI();
+        refreshDualBoardLayout();
     });
 
     gs.socket.on("started-room", (raw: SerializedGame, timeStarted: number) => {

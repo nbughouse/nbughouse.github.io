@@ -4,7 +4,7 @@ import { roomExists } from "./room-api";
 import { setStoredProfileValue, sn } from "./session";
 import { sanitizePlayerName } from "@shared/player";
 import { getBasePath } from "./app-paths";
-import { applyAllChessSettings } from "./chess-ui";
+import { applyAllChessSettings, applyPieceAnimationSpeed } from "./chess-ui";
 import { initMenuBackground } from "./menu-background";
 import { fetchSiteStats, type SiteStats } from "./stats-api";
 import {
@@ -334,6 +334,7 @@ function setupSettingsView(): void {
             animationSpeedInput.value,
         );
         saveMenuSettings(false);
+        applyPieceAnimationSpeed();
     });
 
     bindMenuSettingCheckbox("#menu-setting-auto-queen", "autoQueen");

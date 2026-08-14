@@ -392,6 +392,15 @@ export class Chess {
             return CastleMove.LONG;
     }
 
+    private getLegalCastleSideForMove(
+        piece: Piece,
+        from: BoardPosition,
+        to: BoardPosition,
+    ): CastleMove | undefined {
+        const side = this.getCastleSideForMove(piece, from, to);
+        return side && this.canCastle(piece.color, side) ? side : undefined;
+    }
+
     private isEnPassantMove(from: BoardPosition, to: BoardPosition): boolean {
         if (!this.enPassantTarget) return false;
         const piece = this.board[from.row][from.col];
@@ -526,7 +535,10 @@ export class Chess {
         )
             return MoveType.NORMAL;
 
-        if (piece && this.getCastleSideForMove(piece, move.from, move.to))
+        if (
+            piece &&
+            this.getLegalCastleSideForMove(piece, move.from, move.to)
+        )
             return MoveType.CASTLE;
 
         if (
@@ -555,7 +567,9 @@ export class Chess {
         if (!piece) return false;
 
         const targetPiece = this.board[to.row][to.col];
-        const castleSide = this.getCastleSideForMove(piece, from, to);
+        const castleSide = premove
+            ? this.getCastleSideForMove(piece, from, to)
+            : this.getLegalCastleSideForMove(piece, from, to);
         if (
             targetPiece?.type === PieceType.KING &&
             !rules.allowKingCapture
@@ -707,7 +721,9 @@ export class Chess {
         if (!piece) return {};
 
         const targetPiece = this.board[to.row][to.col];
-        const castleSide = this.getCastleSideForMove(piece, from, to);
+        const castleSide = premove
+            ? this.getCastleSideForMove(piece, from, to)
+            : this.getLegalCastleSideForMove(piece, from, to);
         const combining =
             rules.accolade && targetPiece
                 ? canCombinePieces(piece, targetPiece)
@@ -1048,7 +1064,11 @@ function randomBackRank(): PieceType[] {
 }
 
 function emptyCols(rank: Array<PieceType | undefined>): number[] {
-    return rank.flatMap((piece, col) => (piece ? [] : [col]));
+    const cols: number[] = [];
+    for (let col = 0; col < rank.length; col++) {
+        if (rank[col] === undefined) cols.push(col);
+    }
+    return cols;
 }
 
 function randomItem<T>(items: T[]): T {
