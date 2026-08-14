@@ -1434,14 +1434,15 @@ function updateGridLayout(): void {
 
     if (useDualBoardUI) {
         const controlledBoardIDs = getControlledBoardIDs();
-        const controlledBoardID =
-            controlledBoardIDs.length === 1 ? controlledBoardIDs[0] : undefined;
+        const preferredPrimaryID = getPreferredPrimaryBoardID(
+            controlledBoardIDs,
+        );
         if (gs.room.status === RoomStatus.LOBBY) {
-            if (controlledBoardID !== undefined)
-                dualBoardPrimaryID = controlledBoardID;
+            if (preferredPrimaryID !== undefined)
+                dualBoardPrimaryID = preferredPrimaryID;
             else dualBoardPrimaryID ??= 0;
         } else if (dualBoardPrimaryID === undefined) {
-            dualBoardPrimaryID = controlledBoardID ?? 0;
+            dualBoardPrimaryID = preferredPrimaryID ?? 0;
         }
 
         // Only emphasize a board when this player controls exactly one of
@@ -1513,14 +1514,27 @@ function getControlledBoardIDs(): number[] {
         .filter((boardID): boardID is number => boardID !== undefined);
 }
 
+function getPreferredPrimaryBoardID(
+    controlledBoardIDs: number[],
+): number | undefined {
+    if (controlledBoardIDs.length === 1) return controlledBoardIDs[0];
+    if (controlledBoardIDs.length < 2 || !gs.player) return undefined;
+
+    const whiteBoardID = gs.room.game.matches.findIndex(
+        (match) => match.whitePlayer?.id === gs.player.id,
+    );
+    return whiteBoardID >= 0 ? whiteBoardID : controlledBoardIDs[0];
+}
+
 export function refreshDualBoardLayout(): void {
     if (gridMode) updateGridLayout();
 }
 
 function lockDualBoardOrderForGame(): void {
     const controlledBoardIDs = getControlledBoardIDs();
-    if (controlledBoardIDs.length === 1)
-        dualBoardPrimaryID = controlledBoardIDs[0];
+    const preferredPrimaryID = getPreferredPrimaryBoardID(controlledBoardIDs);
+    if (preferredPrimaryID !== undefined)
+        dualBoardPrimaryID = preferredPrimaryID;
 }
 
 // MARK: Start/End Game UI
