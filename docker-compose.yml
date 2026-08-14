@@ -10,6 +10,7 @@ services:
             PORT: 8000
             FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-https://nbug.app}
             BUGHOUSE_STATS_EVENTS_FILE: /app/data/stats-events.jsonl
+            BUGHOUSE_PROFILES_FILE: /app/data/profiles.json
         volumes:
             - /opt/BughouseNPlayer-data:/app/data
         expose:

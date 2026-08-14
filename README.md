@@ -108,6 +108,7 @@ Backend variables:
 | `FRONTEND_ORIGIN` | `https://nbug.app` | Primary allowed browser origin for Socket.IO CORS. |
 | `ALLOWED_ORIGINS` | unset | Optional comma-separated extra allowed origins. |
 | `BUGHOUSE_STATS_EVENTS_FILE` | unset locally, `/app/data/stats-events.jsonl` in Docker | Append-only server event log used to derive public stats. |
+| `BUGHOUSE_PROFILES_FILE` | Beside `BUGHOUSE_STATS_EVENTS_FILE`, `/app/data/profiles.json` in Docker | Persistent anonymous IDs, authentication tokens, and player names. |
 
 ## Deployment
 

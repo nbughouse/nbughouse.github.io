@@ -15,6 +15,7 @@ import {
     recordCompletedGame,
     recordPlayerSeen,
 } from "./stats-store";
+import { loadProfiles, saveProfiles, type Profile } from "./profile-store";
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -25,17 +26,11 @@ export const io = new Server(httpServer, {
     },
 });
 export const rooms = new Map<string, Room>();
-export const profiles = new Map<string, Profile>();
+export const profiles = loadProfiles();
 
 export class GameSocket extends Socket {
     room: Room | undefined;
     player!: Player;
-}
-
-export interface Profile {
-    name: string;
-    id: string;
-    auth: string;
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -180,10 +175,10 @@ setInterval(() => {
 }, 100);
 
 function randomPlayerID(): string {
-    return (
-        Math.random().toString(36).slice(2, 15) +
-        Math.random().toString(36).slice(2, 15)
-    );
+    let id: string;
+    do id = randomBytes(16).toString("hex");
+    while (profiles.has(id));
+    return id;
 }
 
 function randomAuth(): string {
@@ -197,6 +192,7 @@ function issueFreshProfile(socket: GameSocket): void {
 
     socket.player = player;
     profiles.set(id, { name: player.name, id, auth });
+    saveProfiles(profiles);
     recordPlayerSeen(id);
     socket.emit("created-player", id, auth);
 }

@@ -12,6 +12,7 @@ import { Room, RoomStatus, Team } from "@shared/room";
 import type { GameSocket } from "./index";
 import { io, profiles, rooms } from "./index";
 import { recordCompletedGame } from "./stats-store";
+import { saveProfiles } from "./profile-store";
 
 export function setupHandlers(socket: GameSocket): void {
     socket.on("ping", () => {
@@ -45,7 +46,10 @@ export function setupHandlers(socket: GameSocket): void {
         socket.player.name = trimmedName;
 
         const profile = profiles.get(socket.player.id);
-        if (profile) profile.name = trimmedName;
+        if (profile) {
+            profile.name = trimmedName;
+            saveProfiles(profiles);
+        }
 
         if (room && roomPlayer) {
             roomPlayer.name = trimmedName;
