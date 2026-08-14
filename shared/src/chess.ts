@@ -566,39 +566,35 @@ export class Chess {
         const piece = this.board[from.row][from.col];
         if (!piece) return false;
 
+        if (premove)
+            return this.isValidMovementPattern(piece, from, to, true);
+
         const targetPiece = this.board[to.row][to.col];
-        const castleSide = premove
-            ? this.getCastleSideForMove(piece, from, to)
-            : this.getLegalCastleSideForMove(piece, from, to);
+        const castleSide = this.getLegalCastleSideForMove(piece, from, to);
         if (
             targetPiece?.type === PieceType.KING &&
             !rules.allowKingCapture
         )
             return false;
 
-        // In premove mode, skip turn and friendly fire checks
-        if (!premove) {
-            if (this.turn !== piece.color) return false;
+        if (this.turn !== piece.color) return false;
 
-            if (
-                targetPiece &&
-                targetPiece.color === piece.color &&
-                !(
-                    castleSide &&
-                    targetPiece.type === PieceType.ROOK &&
-                    to.col === this.getCastleRookCol(piece.color, castleSide)
-                ) &&
-                !(rules.accolade && canCombinePieces(piece, targetPiece))
-            )
-                return false;
-        }
-
-        // Check if movement pattern is valid
-        if (!this.isValidMovementPattern(piece, from, to, premove))
+        if (
+            targetPiece &&
+            targetPiece.color === piece.color &&
+            !(
+                castleSide &&
+                targetPiece.type === PieceType.ROOK &&
+                to.col === this.getCastleRookCol(piece.color, castleSide)
+            ) &&
+            !(rules.accolade && canCombinePieces(piece, targetPiece))
+        )
             return false;
 
-        // In premove mode, skip check validation
-        if (premove) return true;
+        // Check if movement pattern is valid
+        if (!this.isValidMovementPattern(piece, from, to, false))
+            return false;
+
         if (castleSide) return true;
         if (rules.allowKingCapture) return true;
 
