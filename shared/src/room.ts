@@ -127,11 +127,14 @@ export class Room {
         this.players.set(player.id, player);
     }
 
-    removePlayer(id: string): void {
+    removePlayer(id: string, reassignHost = true): void {
         this.players.delete(id);
         this.removePlayerFromBoards(id);
 
-        if (this.hostID === id) this.hostID = this.nextConnectedPlayerID();
+        if (this.hostID === id)
+            this.hostID = reassignHost
+                ? this.nextConnectedPlayerID()
+                : undefined;
     }
 
     removePlayerFromBoards(id: string): void {
@@ -139,6 +142,19 @@ export class Room {
             if (match.whitePlayer?.id === id) match.whitePlayer = undefined;
             if (match.blackPlayer?.id === id) match.blackPlayer = undefined;
         }
+    }
+
+    transferHost(id: string): boolean {
+        const player = this.players.get(id);
+        if (!player || player.status === PlayerStatus.DISCONNECTED)
+            return false;
+
+        this.hostID = id;
+        return true;
+    }
+
+    reassignHost(): void {
+        this.hostID = this.nextConnectedPlayerID();
     }
 
     private nextConnectedPlayerID(): string | undefined {
@@ -207,6 +223,10 @@ export class Room {
         for (const [id, player] of this.players)
             if (player.status === PlayerStatus.DISCONNECTED)
                 this.removePlayer(id);
+
+        const host = this.hostID ? this.players.get(this.hostID) : undefined;
+        if (!host || host.status === PlayerStatus.DISCONNECTED)
+            this.reassignHost();
     }
 
     updateConfig(config: Partial<GameConfig>): boolean {

@@ -168,6 +168,7 @@ setInterval(() => {
                     getPlayerDisplayName(timeout.player) + " timed out.",
                     currentTime,
                 );
+                io.to(code).emit("room-host-updated", room.hostID);
                 if (room.players.size === 0) rooms.delete(code);
             }
         }

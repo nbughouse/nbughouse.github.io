@@ -52,12 +52,18 @@ export function setupHandlers(socket: GameSocket): void {
         }
 
         if (room && roomPlayer) {
+            const oldName = getPlayerDisplayName(roomPlayer);
             roomPlayer.name = trimmedName;
             io.to(room.code).emit(
                 "p-set-name",
                 socket.player.id,
                 trimmedName,
             );
+            if (oldName !== getPlayerDisplayName(roomPlayer))
+                emitRoomServerChat(
+                    room,
+                    `${oldName} changed their name to ${getPlayerDisplayName(roomPlayer)}.`,
+                );
         }
     });
 
@@ -76,11 +82,11 @@ export function setupHandlers(socket: GameSocket): void {
     });
 
     socket.on("leave-room", () => {
-        handlePlayerLeave(socket);
+        handlePlayerLeave(socket, true);
     });
 
     socket.on("disconnect", () => {
-        handlePlayerLeave(socket);
+        handlePlayerLeave(socket, false);
     });
 
     socket.on("start-room", () => {
@@ -94,6 +100,7 @@ export function setupHandlers(socket: GameSocket): void {
                 socket.room.game.serialize(),
                 currentTime,
             );
+            emitRoomServerChat(socket.room, "The game started.");
         }
     });
 
@@ -108,6 +115,10 @@ export function setupHandlers(socket: GameSocket): void {
             socket.room.game.serialize(),
         );
         io.to(socket.room.code).emit("room-host-updated", socket.room.hostID);
+        emitRoomServerChat(
+            socket.room,
+            `${getPlayerDisplayName(socket.player)} updated the room settings.`,
+        );
     });
 
     socket.on("send-chat", (message: string) => {
@@ -119,6 +130,11 @@ export function setupHandlers(socket: GameSocket): void {
 
         if (trimmedMessage.toLowerCase().startsWith("/ban ")) {
             handleBanCommand(socket, trimmedMessage.slice(5).trim());
+            return;
+        }
+
+        if (trimmedMessage.toLowerCase().startsWith("/host ")) {
+            handleHostCommand(socket, trimmedMessage.slice(6).trim());
             return;
         }
 
@@ -181,6 +197,10 @@ export function setupHandlers(socket: GameSocket): void {
             boardID,
             color,
         );
+        emitRoomServerChat(
+            socket.room,
+            `${getPlayerDisplayName(player)} joined board ${boardID + 1} as ${color}.`,
+        );
     });
 
     socket.on("move-board", (boardID: number, color: Color, move: Move) => {
@@ -209,11 +229,21 @@ export function setupHandlers(socket: GameSocket): void {
         if (kingWinner) {
             recordCompletedGame(socket.room);
             socket.room.endRoom(kingWinner);
+            recordRoomServerChat(
+                socket.room,
+                `Team ${kingWinner} won! ${
+                    kingWinner === Team.BLUE ? "Blue" : "Red"
+                } captured all kings!`,
+            );
             io.to(socket.room.code).emit(
                 "ended-room",
                 kingWinner,
                 `${kingWinner === Team.BLUE ? "Blue" : "Red"} captured all kings!`,
                 currentTime,
+            );
+            io.to(socket.room.code).emit(
+                "room-host-updated",
+                socket.room.hostID,
             );
         } else if (
             !socket.room.game.getMoveRules().allowKingCapture &&
@@ -225,11 +255,19 @@ export function setupHandlers(socket: GameSocket): void {
 
             recordCompletedGame(socket.room);
             socket.room.endRoom(winningTeam);
+            recordRoomServerChat(
+                socket.room,
+                `Team ${winningTeam} won! ${getPlayerDisplayName(winner)} won!`,
+            );
             io.to(socket.room.code).emit(
                 "ended-room",
                 winningTeam,
                 getPlayerDisplayName(winner) + " won!",
                 currentTime,
+            );
+            io.to(socket.room.code).emit(
+                "room-host-updated",
+                socket.room.hostID,
             );
         }
     });
@@ -242,6 +280,12 @@ export function setupHandlers(socket: GameSocket): void {
 
         board.removePlayer(color);
         io.to(socket.room.code).emit("p-left-board", boardID, color);
+        emitRoomServerChat(
+            socket.room,
+            `${getPlayerDisplayName(socket.player)} left board ${
+                boardID + 1
+            } as ${color}.`,
+        );
     });
 
     socket.on("toggle-spectator", () => {
@@ -264,6 +308,10 @@ export function setupHandlers(socket: GameSocket): void {
                 socket.player.id,
                 PlayerStatus.CONNECTED,
             );
+            emitRoomServerChat(
+                socket.room,
+                `${getPlayerDisplayName(player)} is no longer spectating.`,
+            );
             return;
         }
 
@@ -273,6 +321,10 @@ export function setupHandlers(socket: GameSocket): void {
                 "p-set-status",
                 socket.player.id,
                 PlayerStatus.SPECTATING,
+            );
+            emitRoomServerChat(
+                socket.room,
+                `${getPlayerDisplayName(player)} is now spectating.`,
             );
             return;
         }
@@ -290,6 +342,10 @@ export function setupHandlers(socket: GameSocket): void {
             socket.player.id,
             PlayerStatus.SPECTATING,
         );
+        emitRoomServerChat(
+            socket.room,
+            `${getPlayerDisplayName(player)} is now spectating.`,
+        );
     });
 
     socket.on("resign-room", () => {
@@ -299,14 +355,20 @@ export function setupHandlers(socket: GameSocket): void {
         if (!playerTeam) return;
 
         const winningTeam = playerTeam === Team.BLUE ? Team.RED : Team.BLUE;
+        const reason = "Resigned by " + getPlayerDisplayName(socket.player);
 
         recordCompletedGame(socket.room);
         socket.room.endRoom(winningTeam);
+        recordRoomServerChat(socket.room, `Team ${winningTeam} won! ${reason}`);
         io.to(socket.room.code).emit(
             "ended-room",
             winningTeam,
-            "Resigned by " + getPlayerDisplayName(socket.player),
+            reason,
             Date.now(),
+        );
+        io.to(socket.room.code).emit(
+            "room-host-updated",
+            socket.room.hostID,
         );
     });
 }
@@ -372,11 +434,40 @@ function handleBanCommand(socket: GameSocket, targetName: string): void {
     }
 
     banPlayerFromRoom(room, target.id);
-    io.to(room.code).emit(
-        "p-sent-chat",
-        "server",
-        `${getPlayerDisplayName(target)} was banned from the room.`,
+    emitRoomServerChat(
+        room,
+        `${getPlayerDisplayName(target)} was kicked from the room.`,
     );
+}
+
+function handleHostCommand(socket: GameSocket, targetName: string): void {
+    const room = socket.room;
+    if (!room || !targetName) return;
+
+    if (room.hostID !== socket.player.id) {
+        emitServerChat(socket, "Only the host can reassign host.");
+        return;
+    }
+
+    const target = findPlayerByDisplayName(room, targetName);
+    if (!target) {
+        emitServerChat(socket, `No player named "${targetName}" is in this room.`);
+        return;
+    }
+
+    if (target.status === PlayerStatus.DISCONNECTED) {
+        emitServerChat(socket, `${getPlayerDisplayName(target)} is disconnected.`);
+        return;
+    }
+
+    if (target.id === socket.player.id) {
+        emitServerChat(socket, "You are already the host.");
+        return;
+    }
+
+    room.transferHost(target.id);
+    io.to(room.code).emit("room-host-updated", room.hostID);
+    emitRoomServerChat(room, `${getPlayerDisplayName(target)} is now the host.`);
 }
 
 function banPlayerFromRoom(room: Room, playerID: string): void {
@@ -405,6 +496,27 @@ function banPlayerFromRoom(room: Room, playerID: string): void {
 
 function emitServerChat(socket: GameSocket, message: string): void {
     socket.emit("p-sent-chat", "server", message);
+}
+
+function emitRoomServerChat(room: Room, message: string): void {
+    const chatMessage = recordRoomServerChat(room, message);
+    io.to(room.code).emit("p-sent-chat", chatMessage.id, chatMessage.message);
+}
+
+function emitHostUpdateMessage(room: Room): void {
+    if (!room.hostID) return;
+
+    const host = room.players.get(room.hostID);
+    if (!host) return;
+
+    emitRoomServerChat(room, `${getPlayerDisplayName(host)} is now the host.`);
+}
+
+function recordRoomServerChat(room: Room, message: string): {
+    id: string;
+    message: string;
+} {
+    return room.chat.push("server", message);
 }
 
 function findPlayerByDisplayName(
@@ -473,12 +585,14 @@ function joinRoom(socket: GameSocket, code: string): void {
         return;
     }
 
-    if (socket.room) handlePlayerLeave(socket);
+    if (socket.room) handlePlayerLeave(socket, true);
 
     socket.join(code);
     socket.room = room;
 
     if (playerInRoom) {
+        const wasDisconnected =
+            playerInRoom.status === PlayerStatus.DISCONNECTED;
         playerInRoom.name = socket.player.name;
         playerInRoom.status = PlayerStatus.CONNECTED;
         socket.emit("joined-room", room.serialize());
@@ -488,6 +602,12 @@ function joinRoom(socket: GameSocket, code: string): void {
         socket
             .to(room.code)
             .emit("p-set-status", socket.player.id, PlayerStatus.CONNECTED);
+        emitRoomServerChat(
+            room,
+            `${getPlayerDisplayName(playerInRoom)} ${
+                wasDisconnected ? "reconnected" : "rejoined the room"
+            }.`,
+        );
     } else {
         const roomPlayer = new Player(
             socket.player.id,
@@ -501,6 +621,10 @@ function joinRoom(socket: GameSocket, code: string): void {
             socket.player.name,
         );
         socket.emit("joined-room", room.serialize());
+        emitRoomServerChat(
+            room,
+            `${getPlayerDisplayName(roomPlayer)} joined the room.`,
+        );
     }
 }
 
@@ -518,42 +642,99 @@ function hasAnotherRoomConnection(socket: GameSocket, code: string): boolean {
     return false;
 }
 
-function handlePlayerLeave(socket: GameSocket): void {
+function handlePlayerLeave(socket: GameSocket, intentionalLeave: boolean): void {
     const room = socket.room;
     if (!room) return;
 
     socket.leave(room.code);
 
-    if (room.status === RoomStatus.LOBBY) handleLobbyPlayerLeave(socket, room);
-    else handleGamePlayerDisconnect(socket, room);
+    if (room.status === RoomStatus.LOBBY)
+        handleLobbyPlayerLeave(socket, room, intentionalLeave);
+    else handleGamePlayerDisconnect(socket, room, intentionalLeave);
 
     socket.room = undefined;
 
     if (shouldDeleteRoom(room)) deleteRoom(room.code);
 }
 
-function handleLobbyPlayerLeave(socket: GameSocket, room: Room): void {
+function handleLobbyPlayerLeave(
+    socket: GameSocket,
+    room: Room,
+    intentionalLeave: boolean,
+): void {
     const vacatedSeats = getPlayerSeats(room, socket.player.id);
+    const player = room.players.get(socket.player.id);
+    const playerName = player
+        ? getPlayerDisplayName(player)
+        : getPlayerDisplayName(socket.player);
+    const previousHostID = room.hostID;
 
-    room.removePlayer(socket.player.id);
+    room.removePlayer(socket.player.id, intentionalLeave);
     socket.to(room.code).emit("p-left-room", socket.player.id);
 
     for (const { boardID, color } of vacatedSeats)
         socket.to(room.code).emit("p-left-board", boardID, color);
 
     socket.to(room.code).emit("room-host-updated", room.hostID);
+    emitRoomServerChat(
+        room,
+        `${playerName} ${intentionalLeave ? "left the room" : "disconnected"}.`,
+    );
+    if (previousHostID !== room.hostID) emitHostUpdateMessage(room);
 }
 
-function handleGamePlayerDisconnect(socket: GameSocket, room: Room): void {
+function handleGamePlayerDisconnect(
+    socket: GameSocket,
+    room: Room,
+    intentionalLeave: boolean,
+): void {
     const player = room.players.get(socket.player.id);
     if (!player) return;
+    const previousHostID = room.hostID;
 
     if (getPlayerSeats(room, socket.player.id).length === 0) {
+        if (!intentionalLeave && room.hostID === socket.player.id) {
+            markPlayerDisconnected(socket, room);
+            emitRoomServerChat(
+                room,
+                `${getPlayerDisplayName(player)} disconnected.`,
+            );
+            return;
+        }
+
         room.removePlayer(socket.player.id);
         socket.to(room.code).emit("p-left-room", socket.player.id);
         socket.to(room.code).emit("room-host-updated", room.hostID);
+        emitRoomServerChat(
+            room,
+            `${getPlayerDisplayName(player)} ${
+                intentionalLeave ? "left the room" : "disconnected and left the room"
+            }.`,
+        );
+        if (previousHostID !== room.hostID) emitHostUpdateMessage(room);
         return;
     }
+
+    markPlayerDisconnected(socket, room);
+    emitRoomServerChat(
+        room,
+        `${getPlayerDisplayName(player)} ${
+            intentionalLeave
+                ? "left the room and was marked disconnected"
+                : "disconnected"
+        }.`,
+    );
+
+    if (intentionalLeave && room.hostID === socket.player.id) {
+        room.reassignHost();
+        socket.to(room.code).emit("room-host-updated", room.hostID);
+        if (previousHostID !== room.hostID) emitHostUpdateMessage(room);
+    }
+}
+
+function markPlayerDisconnected(socket: GameSocket, room: Room): void {
+    const player = room.players.get(socket.player.id);
+    if (!player) return;
 
     player.status = PlayerStatus.DISCONNECTED;
     socket
