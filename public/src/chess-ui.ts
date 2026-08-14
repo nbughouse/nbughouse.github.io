@@ -34,6 +34,8 @@ let pendingPromotion:
     | {
           dialog: HTMLDivElement;
           callback: (pieceType: PieceType) => void;
+          onCancel: () => void;
+          cleanup: () => void;
       }
     | undefined;
 
@@ -362,10 +364,16 @@ export function createPocketElement(
 
 function showPromotionDialog(
     boardID: number,
+    to: BoardPosition,
     color: Color,
     callback: (pieceType: PieceType) => void,
+    onCancel: () => void,
 ): void {
     if (pendingPromotion) return;
+
+    // The drag preview otherwise sits above the chooser while the decision is
+    // pending. The selected pawn itself remains selected until choice/cancel.
+    dropSelectedPiece();
 
     // Clean up any dialog left behind by an earlier version of the UI before
     // creating the single active promotion prompt.
@@ -379,25 +387,83 @@ function showPromotionDialog(
     dialog.setAttribute("aria-label", "Choose a promotion piece");
     dialog.setAttribute("aria-modal", "true");
 
-    pendingPromotion = { dialog, callback };
+    const visualRow = isFlipped(boardID) ? 7 - to.row : to.row;
+    dialog.classList.add(
+        visualRow === 0 ? "promotion-dialog-down" : "promotion-dialog-up",
+    );
+
+    const positionDialog = () => {
+        const square = getSquareElement(boardID, to);
+        const bounds = square.getBoundingClientRect();
+
+        dialog.style.setProperty("--promotion-square-size", `${bounds.width}px`);
+        dialog.style.left = `${bounds.left}px`;
+        if (visualRow === 0) {
+            dialog.style.top = `${bounds.top}px`;
+            dialog.style.bottom = "auto";
+        } else {
+            dialog.style.top = "auto";
+            dialog.style.bottom = `${window.innerHeight - bounds.bottom}px`;
+        }
+    };
+
+    const handlePromotionKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        cancelPromotion();
+    };
+    const cleanup = () => {
+        window.removeEventListener("resize", positionDialog);
+        window.removeEventListener("scroll", positionDialog, true);
+        document.removeEventListener("keydown", handlePromotionKeyDown);
+        dialog.remove();
+    };
+
+    pendingPromotion = { dialog, callback, onCancel, cleanup };
 
     const pieces = [
         PieceType.QUEEN,
+        PieceType.KNIGHT,
         PieceType.ROOK,
         PieceType.BISHOP,
-        PieceType.KNIGHT,
     ];
 
+    const pieceNames: Record<(typeof pieces)[number], string> = {
+        [PieceType.QUEEN]: "queen",
+        [PieceType.KNIGHT]: "knight",
+        [PieceType.ROOK]: "rook",
+        [PieceType.BISHOP]: "bishop",
+    };
+
     for (const pieceType of pieces) {
-        const pieceButton = createPieceElement({ type: pieceType, color });
-        pieceButton.classList.add("promotion-option");
+        const pieceButton = document.createElement("button");
+        pieceButton.type = "button";
+        pieceButton.className = "promotion-option";
+        pieceButton.setAttribute(
+            "aria-label",
+            `Promote to ${pieceNames[pieceType]}`,
+        );
+        pieceButton.append(createPieceElement({ type: pieceType, color }));
         pieceButton.addEventListener("click", () => {
             handlePromotionChoice(pieceType);
         });
         dialog.append(pieceButton);
     }
 
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "promotion-cancel";
+    cancelButton.setAttribute("aria-label", "Cancel promotion");
+    cancelButton.textContent = "\u00d7";
+    cancelButton.addEventListener("click", cancelPromotion);
+    dialog.append(cancelButton);
+
     document.body.append(dialog);
+    positionDialog();
+    window.addEventListener("resize", positionDialog);
+    window.addEventListener("scroll", positionDialog, true);
+    document.addEventListener("keydown", handlePromotionKeyDown);
+    dialog.querySelector<HTMLButtonElement>("button")?.focus();
 }
 
 function handlePromotionChoice(pieceType: PieceType): void {
@@ -407,12 +473,21 @@ function handlePromotionChoice(pieceType: PieceType): void {
     // Clear the pending state before executing the move. This keeps the modal
     // lifecycle correct even if the callback synchronously updates the board.
     pendingPromotion = undefined;
-    promotion.dialog.remove();
+    promotion.cleanup();
     promotion.callback(pieceType);
 }
 
+function cancelPromotion(): void {
+    const promotion = pendingPromotion;
+    if (!promotion) return;
+
+    pendingPromotion = undefined;
+    promotion.cleanup();
+    promotion.onCancel();
+}
+
 function closePromotionDialog(): void {
-    pendingPromotion?.dialog.remove();
+    pendingPromotion?.cleanup();
     pendingPromotion = undefined;
 
     for (const staleDialog of document.querySelectorAll(".promotion-dialog"))
@@ -533,10 +608,16 @@ function attemptMove(id: number, to: Position): boolean {
             move.promotion = PieceType.QUEEN;
             executeMove(id, move, premove);
         } else {
-            showPromotionDialog(id, selected.piece.color, (pieceType) => {
-                move.promotion = pieceType;
-                executeMove(id, move, premove);
-            });
+            showPromotionDialog(
+                id,
+                to,
+                selected.piece.color,
+                (pieceType) => {
+                    move.promotion = pieceType;
+                    executeMove(id, move, premove);
+                },
+                deselectPiece,
+            );
         }
         return true;
     }
@@ -1249,11 +1330,17 @@ function handleSquareMouseUp(event: MouseEvent): void {
                 suppressMoveAnimation(id, move);
                 executeMove(id, move, premove);
             } else {
-                showPromotionDialog(id, selected.piece.color, (pieceType) => {
-                    move.promotion = pieceType;
-                    suppressMoveAnimation(id, move);
-                    executeMove(id, move, premove);
-                });
+                showPromotionDialog(
+                    id,
+                    pos,
+                    selected.piece.color,
+                    (pieceType) => {
+                        move.promotion = pieceType;
+                        suppressMoveAnimation(id, move);
+                        executeMove(id, move, premove);
+                    },
+                    deselectPiece,
+                );
             }
             return;
         }
