@@ -883,7 +883,9 @@ export function updateUIPlayerList(): void {
 
             const isCurrentPlayer = id === gs.player.id;
 
-            const relationshipClass = getPlayerRelationshipClass(id);
+            const relationshipClass = isCurrentPlayer
+                ? "own"
+                : getPlayerRelationshipClass(id);
             playerDiv.className =
                 `player-item ${statusClasses.join(" ")} ${relationshipClass}`.trim();
             playerDiv.dataset.playerId = id;
@@ -973,9 +975,8 @@ export function updateUIAllChat(): void {
 }
 
 export function updateUIPushChat(message: ChatMessage): void {
-    const chatMessagesDiv = document.querySelector("#chat-messages");
     const chatMessageList = document.querySelector("#chat-message-list");
-    if (!chatMessagesDiv || !chatMessageList) return;
+    if (!chatMessageList) return;
 
     const getSenderName = () => {
         if (message.id === gs.player.id) return "You";
@@ -986,23 +987,34 @@ export function updateUIPushChat(message: ChatMessage): void {
 
     const messageDiv = document.createElement("div");
     const appearance = getStoredChatAppearance(message);
+    const isGameLifecycleMessage =
+        message.id === "server" &&
+        (message.message === "The game started." ||
+            /^Team (?:red|blue) won!/.test(message.message));
     messageDiv.className = `chat-message ${
         message.id === gs.player.id ? "own" : ""
     } ${message.id === "server" ? "server" : ""} ${
         getPlayerRelationshipClass(message.id)
     }`.trim();
-    messageDiv.style.backgroundColor = appearance.color;
-    messageDiv.style.opacity = appearance.opacity.toString();
+    messageDiv.classList.toggle("game-lifecycle", isGameLifecycleMessage);
+    if (message.id !== "server") {
+        messageDiv.style.backgroundColor = appearance.color;
+        messageDiv.style.opacity = appearance.opacity.toString();
+    }
 
     const senderName = getSenderName();
+    const showAllChatLabel = shouldShowAllChatLabel(message);
     const previousMessage = chatMessageList.lastElementChild as HTMLElement | null;
 
     if (
         gs.settings.messageGrouping &&
+        !isGameLifecycleMessage &&
+        previousMessage?.dataset.gameLifecycle !== "true" &&
         previousMessage?.dataset.senderId === message.id &&
         previousMessage.dataset.color === appearance.color &&
         previousMessage.dataset.opacity === appearance.opacity.toString() &&
-        previousMessage.dataset.badges === appearance.badges.join(",")
+        previousMessage.dataset.badges === appearance.badges.join(",") &&
+        previousMessage.dataset.allChat === showAllChatLabel.toString()
     ) {
         previousMessage.classList.add("grouped");
         const text = previousMessage.querySelector(".chat-text");
@@ -1010,7 +1022,7 @@ export function updateUIPushChat(message: ChatMessage): void {
             text.textContent = text.textContent
                 ? `${text.textContent}\n${message.message}`
                 : message.message;
-        chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+        chatMessageList.scrollTop = chatMessageList.scrollHeight;
         return;
     }
 
@@ -1018,6 +1030,8 @@ export function updateUIPushChat(message: ChatMessage): void {
     messageDiv.dataset.color = appearance.color;
     messageDiv.dataset.opacity = appearance.opacity.toString();
     messageDiv.dataset.badges = appearance.badges.join(",");
+    messageDiv.dataset.allChat = showAllChatLabel.toString();
+    messageDiv.dataset.gameLifecycle = isGameLifecycleMessage.toString();
 
     const senderDiv = document.createElement("div");
     senderDiv.className = "chat-sender";
@@ -1025,6 +1039,13 @@ export function updateUIPushChat(message: ChatMessage): void {
     const senderNameSpan = document.createElement("span");
     senderNameSpan.textContent = senderName;
     senderDiv.append(senderNameSpan);
+
+    if (showAllChatLabel) {
+        const allChatLabel = document.createElement("span");
+        allChatLabel.className = "chat-all-label";
+        allChatLabel.textContent = "(all)";
+        senderDiv.append(allChatLabel);
+    }
 
     for (const badge of appearance.badges)
         senderDiv.append(createChatBadge(badge));
@@ -1035,7 +1056,20 @@ export function updateUIPushChat(message: ChatMessage): void {
 
     messageDiv.append(senderDiv, textDiv);
     chatMessageList.append(messageDiv);
-    chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    chatMessageList.scrollTop = chatMessageList.scrollHeight;
+}
+
+function shouldShowAllChatLabel(message: ChatMessage): boolean {
+    if (!message.isAllChat || gs.room.status !== RoomStatus.PLAYING)
+        return false;
+
+    const ownTeam = getPlayerTeam(gs.player.id);
+    if (!ownTeam) return false;
+
+    return gs.room.game.matches.some((match) => {
+        const teammate = match.getPlayerTeam(ownTeam);
+        return teammate !== undefined && teammate.id !== gs.player.id;
+    });
 }
 
 export function getPlayerPlaqueAppearance(playerID: string): {

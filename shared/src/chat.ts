@@ -5,6 +5,7 @@ const CHAT_CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/
 export interface ChatMessage {
     id: string;
     message: string;
+    isAllChat?: boolean;
     color?: string;
     opacity?: number;
     badges?: ChatBadge[];
@@ -38,6 +39,7 @@ export class Chat {
                 typeof message.color === "string" ? message.color : undefined,
                 typeof message.opacity === "number" ? message.opacity : undefined,
                 Array.isArray(message.badges) ? message.badges : undefined,
+                message.isAllChat === true,
             );
         }
         return chat;
@@ -49,6 +51,7 @@ export class Chat {
         color?: string,
         opacity?: number,
         badges?: ChatBadge[],
+        isAllChat?: boolean,
     ): ChatMessage {
         const chatMessage = {
             id,
@@ -56,6 +59,7 @@ export class Chat {
             color,
             opacity,
             badges: sanitizeChatBadges(badges),
+            isAllChat: isAllChat === true,
         };
         this.messages.push(chatMessage);
         if (this.messages.length > 100) this.messages.shift();

@@ -227,15 +227,19 @@ export function initGameSocket(): void {
 
     });
 
-    gs.socket.on("p-sent-chat", (id: string, message: string) => {
-        const plaque = getPlayerPlaqueAppearance(id);
-        const chatMessage = gs.room.chat.push(
-            id,
-            sanitizeChatMessage(message),
-            plaque.color,
-            plaque.opacity,
-            plaque.badges,
-        );
-        updateUIPushChat(chatMessage);
-    });
+    gs.socket.on(
+        "p-sent-chat",
+        (id: string, message: string, isAllChat = false) => {
+            const plaque = getPlayerPlaqueAppearance(id);
+            const chatMessage = gs.room.chat.push(
+                id,
+                sanitizeChatMessage(message),
+                plaque.color,
+                plaque.opacity,
+                plaque.badges,
+                isAllChat,
+            );
+            updateUIPushChat(chatMessage);
+        },
+    );
 }

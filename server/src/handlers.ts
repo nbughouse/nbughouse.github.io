@@ -115,10 +115,6 @@ export function setupHandlers(socket: GameSocket): void {
             socket.room.game.serialize(),
         );
         io.to(socket.room.code).emit("room-host-updated", socket.room.hostID);
-        emitRoomServerChat(
-            socket.room,
-            `${getPlayerDisplayName(socket.player)} updated the room settings.`,
-        );
     });
 
     socket.on("send-chat", (message: string) => {
@@ -157,11 +153,19 @@ export function setupHandlers(socket: GameSocket): void {
             !hasTeammate(socket.room, team, socket.player.id);
 
         if (sendToAll) {
-            socket.room.chat.push(socket.player.id, outgoingMessage);
+            socket.room.chat.push(
+                socket.player.id,
+                outgoingMessage,
+                undefined,
+                undefined,
+                undefined,
+                true,
+            );
             io.to(socket.room.code).emit(
                 "p-sent-chat",
                 socket.player.id,
                 outgoingMessage,
+                true,
             );
             return;
         }
@@ -308,10 +312,6 @@ export function setupHandlers(socket: GameSocket): void {
                 socket.player.id,
                 PlayerStatus.CONNECTED,
             );
-            emitRoomServerChat(
-                socket.room,
-                `${getPlayerDisplayName(player)} is no longer spectating.`,
-            );
             return;
         }
 
@@ -321,10 +321,6 @@ export function setupHandlers(socket: GameSocket): void {
                 "p-set-status",
                 socket.player.id,
                 PlayerStatus.SPECTATING,
-            );
-            emitRoomServerChat(
-                socket.room,
-                `${getPlayerDisplayName(player)} is now spectating.`,
             );
             return;
         }
@@ -341,10 +337,6 @@ export function setupHandlers(socket: GameSocket): void {
             "p-set-status",
             socket.player.id,
             PlayerStatus.SPECTATING,
-        );
-        emitRoomServerChat(
-            socket.room,
-            `${getPlayerDisplayName(player)} is now spectating.`,
         );
     });
 
