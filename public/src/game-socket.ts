@@ -1,5 +1,6 @@
+import { sanitizeChatMessage } from "@shared/chat";
 import { type Color, type Move } from "@shared/chess";
-import { Player, type PlayerStatus } from "@shared/player";
+import { Player, sanitizePlayerName, type PlayerStatus } from "@shared/player";
 import {
     Room,
     RoomStatus,
@@ -73,7 +74,7 @@ export function initGameSocket(): void {
     gs.socket.on("p-joined-room", (id: string, name: string) => {
         if (id === gs.player.id) return;
 
-        gs.room.addPlayer(new Player(id, name));
+        gs.room.addPlayer(new Player(id, sanitizePlayerName(name)));
         updateUIPlayerList();
     });
 
@@ -86,8 +87,9 @@ export function initGameSocket(): void {
         const player = gs.room.getPlayer(id);
         if (!player) return;
 
-        player.name = name;
-        if (id === gs.player.id) gs.player.name = name;
+        const sanitizedName = sanitizePlayerName(name);
+        player.name = sanitizedName;
+        if (id === gs.player.id) gs.player.name = sanitizedName;
         updateUIPlayerList();
         updateUIAllPlayers();
         updateUIAllChat();
@@ -222,7 +224,7 @@ export function initGameSocket(): void {
         const plaque = getPlayerPlaqueAppearance(id);
         const chatMessage = gs.room.chat.push(
             id,
-            message,
+            sanitizeChatMessage(message),
             plaque.color,
             plaque.opacity,
             plaque.badges,

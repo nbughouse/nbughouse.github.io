@@ -1,6 +1,13 @@
+import { sanitizeChatMessage } from "@shared/chat";
 import { Color, type Move } from "@shared/chess";
 import type { GameConfig } from "@shared/config";
-import { getPlayerDisplayName, Player, PlayerStatus } from "@shared/player";
+import {
+    getPlayerDisplayName,
+    isValidPlayerName,
+    PLAYER_NAME_MAX_LENGTH,
+    Player,
+    PlayerStatus,
+} from "@shared/player";
 import { Room, RoomStatus, Team } from "@shared/room";
 import type { GameSocket } from "./index";
 import { io, profiles, rooms } from "./index";
@@ -12,8 +19,17 @@ export function setupHandlers(socket: GameSocket): void {
     });
 
     socket.on("set-name", (name: string) => {
-        const trimmedName = name.trim().slice(0, 20);
+        if (typeof name !== "string") return;
+
+        const trimmedName = name.trim().slice(0, PLAYER_NAME_MAX_LENGTH);
         if (!trimmedName) return;
+        if (!isValidPlayerName(trimmedName)) {
+            socket.emit(
+                "error",
+                "Names can only use letters, numbers, and underscores",
+            );
+            return;
+        }
 
         const room = socket.room;
         const roomPlayer = room?.players.get(socket.player.id);
@@ -92,8 +108,9 @@ export function setupHandlers(socket: GameSocket): void {
 
     socket.on("send-chat", (message: string) => {
         if (!socket.room) return;
+        if (typeof message !== "string") return;
 
-        const trimmedMessage = message.trim().slice(0, 200);
+        const trimmedMessage = sanitizeChatMessage(message);
         if (!trimmedMessage) return;
 
         if (trimmedMessage.toLowerCase().startsWith("/ban ")) {

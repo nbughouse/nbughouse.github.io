@@ -27,7 +27,17 @@ export function getRoomPath(roomCode: string): string {
 
 export function getAssetPath(assetPath: string): string {
 	const cleanAssetPath = assetPath.replace(/^\/+/, "");
-	return `${getBasePath()}assets/${cleanAssetPath}`;
+	const encodedAssetPath = cleanAssetPath
+		.split("/")
+		.map((segment) => {
+			if (!segment || segment === "." || segment === "..")
+				throw new Error("Invalid asset path");
+
+			return encodeURIComponent(segment);
+		})
+		.join("/");
+
+	return `${getBasePath()}assets/${encodedAssetPath}`;
 }
 
 function getPathnameFromBaseUrl(baseUrl: string): string {

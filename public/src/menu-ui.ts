@@ -2,6 +2,7 @@ import { refreshDualBoardLayout, stopPingUpdates } from "./game-ui";
 import { stopTimeUpdates } from "./match-ui";
 import { roomExists } from "./room-api";
 import { setStoredProfileValue, sn } from "./session";
+import { sanitizePlayerName } from "@shared/player";
 import { getBasePath } from "./app-paths";
 import { applyAllChessSettings } from "./chess-ui";
 import { initMenuBackground } from "./menu-background";
@@ -179,7 +180,7 @@ function setupActionNameView(): void {
     });
 
     submitButton.addEventListener("click", () => {
-        const name = nameInput.value.trim();
+        const name = sanitizeNameInput(nameInput);
         if (name) {
             setPlayerName(name);
             syncMenuNameInputs(name);
@@ -197,6 +198,9 @@ function setupActionNameView(): void {
         if (keyEvent.key === "Enter") submitButton.click();
     });
 
+    nameInput.addEventListener("input", () => {
+        sanitizeNameInput(nameInput);
+    });
     nameInput.addEventListener("blur", handleNameSubmit);
 }
 
@@ -219,7 +223,10 @@ function setupJoinView(): void {
     });
 
     submitButton.addEventListener("click", submitJoinView);
-    nameInput.addEventListener("input", updateJoinPlayingAs);
+    nameInput.addEventListener("input", () => {
+        sanitizeNameInput(nameInput);
+        updateJoinPlayingAs();
+    });
     nameInput.addEventListener("blur", handleNameSubmit);
 
     for (const input of [codeInput, nameInput]) {
@@ -448,7 +455,7 @@ async function submitJoinView(): Promise<void> {
         "#join-player-name-input",
     ) as HTMLInputElement;
     const roomCode = codeInput.value.trim().toUpperCase();
-    const name = nameInput.value.trim();
+    const name = sanitizeNameInput(nameInput);
 
     if (roomCode.length !== 4) {
         showError("menu-error", "Enter a 4-character match ID");
@@ -777,10 +784,10 @@ function getCurrentPlayerName(): string {
     ) as HTMLInputElement | null;
 
     return (
-        actionInput?.value.trim() ||
-        joinInput?.value.trim() ||
-        mainInput?.value.trim() ||
-        sn.name.trim()
+        sanitizePlayerName(actionInput?.value || "") ||
+        sanitizePlayerName(joinInput?.value || "") ||
+        sanitizePlayerName(mainInput?.value || "") ||
+        sanitizePlayerName(sn.name)
     );
 }
 
@@ -802,6 +809,7 @@ function syncMenuNameInputs(name: string): void {
 }
 
 export function applyAuthenticatedPlayerName(name: string): void {
+    name = sanitizePlayerName(name);
     sn.name = name;
     if (sn.player) sn.player.name = name;
     setStoredProfileValue("name", name);
@@ -810,7 +818,7 @@ export function applyAuthenticatedPlayerName(name: string): void {
 
 function handleNameSubmit(event: Event): void {
     const target = event.target as HTMLInputElement;
-    const name = target.value.trim();
+    const name = sanitizeNameInput(target);
     if (name) {
         setPlayerName(name);
         syncMenuNameInputs(name);
@@ -818,6 +826,7 @@ function handleNameSubmit(event: Event): void {
 }
 
 function setPlayerName(name: string): void {
+    name = sanitizePlayerName(name);
     sn.name = name;
     if (sn.player) sn.player.name = name;
     setStoredProfileValue("name", name);
@@ -825,7 +834,13 @@ function setPlayerName(name: string): void {
 }
 
 function setupNameInput(elementId: string) {
-    const input = document.querySelector(`#${elementId}`);
+    const input = document.querySelector(`#${elementId}`) as
+        | HTMLInputElement
+        | null;
+
+    input?.addEventListener("input", () => {
+        sanitizeNameInput(input);
+    });
 
     input?.addEventListener("keypress", (event: Event) => {
         const keyEvent = event as KeyboardEvent;
@@ -833,6 +848,12 @@ function setupNameInput(elementId: string) {
     });
 
     input?.addEventListener("blur", handleNameSubmit);
+}
+
+function sanitizeNameInput(input: HTMLInputElement): string {
+    const sanitizedName = sanitizePlayerName(input.value);
+    if (input.value !== sanitizedName) input.value = sanitizedName;
+    return sanitizedName;
 }
 
 function waitForSocketConnection(timeoutMs: number): Promise<boolean> {

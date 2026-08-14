@@ -4,6 +4,8 @@
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta http-equiv="Content-Security-Policy"
+		content="default-src 'self'; script-src 'self' https://cdn.socket.io; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss: http: https:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" />
 	<title>Bughouse</title>
 	<link rel="stylesheet" href="/styles/base.css" />
 	<link rel="stylesheet" href="/styles/menu-background.css" />
@@ -30,6 +32,7 @@
 					<div id="section" class="menu-view">
 						<label id="player-panel" for="player-name-input">
 							<input type="text" id="player-name-input" placeholder="Guest" maxlength="20"
+								pattern="[A-Za-z0-9_]*" title="Use letters, numbers, and underscores only"
 								autocomplete="off" aria-label="Player name" required />
 						</label>
 						<button id="create-game-btn" class="game-action-btn">
@@ -64,6 +67,7 @@
 							</label>
 							<label class="join-field" for="join-player-name-input">
 								<input type="text" id="join-player-name-input" placeholder="Guest" maxlength="20"
+									pattern="[A-Za-z0-9_]*" title="Use letters, numbers, and underscores only"
 									autocomplete="off" aria-label="Player name" required />
 							</label>
 							<button id="submit-join-btn" class="game-action-btn" type="button">
@@ -79,6 +83,7 @@
 						<div id="name-form">
 							<label class="join-field" for="action-player-name-input">
 								<input type="text" id="action-player-name-input" placeholder="Guest" maxlength="20"
+									pattern="[A-Za-z0-9_]*" title="Use letters, numbers, and underscores only"
 									autocomplete="off" aria-label="Player name" required />
 							</label>
 							<button id="submit-action-name-btn" class="game-action-btn" type="button">

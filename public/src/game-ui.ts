@@ -1,4 +1,4 @@
-import type { ChatBadge, ChatMessage } from "@shared/chat";
+import { sanitizeChatMessage, type ChatBadge, type ChatMessage } from "@shared/chat";
 import { Color } from "@shared/chess";
 import type {
     DropAggression,
@@ -1163,7 +1163,7 @@ function getPlayerTeam(playerID: string): Team | undefined {
 export function sendChatMessage(): void {
     const chatInput = document.querySelector("#chat-input") as HTMLInputElement;
 
-    const message = chatInput.value.trim();
+    const message = sanitizeChatMessage(chatInput.value);
     if (message.length > 0) {
         gs.socket.emit("send-chat", message);
         chatInput.value = "";
@@ -1315,28 +1315,58 @@ function setGridMode(enabled: boolean, forceLayout = false): void {
 
     if (gridMode) {
         gameArea.classList.add("grid-mode");
-        gridToggleButton.innerHTML = `
-         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-         </svg>
-        `;
+        replaceGridToggleIcon(gridToggleButton, "grid");
 
         updateGridLayout();
     } else {
         gameArea.classList.remove("grid-mode");
-        gridToggleButton.innerHTML = `
-         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="18"></rect>
-            <rect x="14" y="3" width="7" height="18"></rect>
-         </svg>
-        `;
+        replaceGridToggleIcon(gridToggleButton, "columns");
 
         resetToFlexLayout();
     }
     updateScrollButtons();
+}
+
+function replaceGridToggleIcon(
+    button: HTMLButtonElement,
+    mode: "grid" | "columns",
+): void {
+    button.replaceChildren(createGridToggleIcon(mode));
+}
+
+function createGridToggleIcon(mode: "grid" | "columns"): SVGSVGElement {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", "24");
+    svg.setAttribute("height", "24");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("aria-hidden", "true");
+
+    const rects =
+        mode === "grid"
+            ? [
+                  [3, 3, 7, 7],
+                  [14, 3, 7, 7],
+                  [3, 14, 7, 7],
+                  [14, 14, 7, 7],
+              ]
+            : [
+                  [3, 3, 7, 18],
+                  [14, 3, 7, 18],
+              ];
+
+    for (const [x, y, width, height] of rects) {
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", x.toString());
+        rect.setAttribute("y", y.toString());
+        rect.setAttribute("width", width.toString());
+        rect.setAttribute("height", height.toString());
+        svg.append(rect);
+    }
+
+    return svg;
 }
 
 function initGridLayoutObserver(): void {

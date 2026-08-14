@@ -1,4 +1,6 @@
 export type ChatBadge = "winner" | "spectating" | "disconnected";
+export const CHAT_MESSAGE_MAX_LENGTH = 200;
+const CHAT_CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 export interface ChatMessage {
     id: string;
@@ -24,7 +26,20 @@ export class Chat {
     static deserialize(json: string): Chat {
         const chat = new Chat();
         const data: { messages: ChatMessage[] } = JSON.parse(json);
-        chat.messages = data.messages;
+        if (!Array.isArray(data.messages)) return chat;
+
+        for (const message of data.messages) {
+            if (!message || typeof message.id !== "string") continue;
+            if (typeof message.message !== "string") continue;
+
+            chat.push(
+                message.id,
+                message.message,
+                typeof message.color === "string" ? message.color : undefined,
+                typeof message.opacity === "number" ? message.opacity : undefined,
+                Array.isArray(message.badges) ? message.badges : undefined,
+            );
+        }
         return chat;
     }
 
@@ -35,9 +50,35 @@ export class Chat {
         opacity?: number,
         badges?: ChatBadge[],
     ): ChatMessage {
-        const chatMessage = { id, message, color, opacity, badges };
+        const chatMessage = {
+            id,
+            message: sanitizeChatMessage(message),
+            color,
+            opacity,
+            badges: sanitizeChatBadges(badges),
+        };
         this.messages.push(chatMessage);
         if (this.messages.length > 100) this.messages.shift();
         return chatMessage;
     }
+}
+
+export function sanitizeChatMessage(message: string): string {
+    return message
+        .replace(CHAT_CONTROL_CHARACTERS, "")
+        .trim()
+        .slice(0, CHAT_MESSAGE_MAX_LENGTH);
+}
+
+function sanitizeChatBadges(
+    badges: ChatBadge[] | undefined,
+): ChatBadge[] | undefined {
+    if (!badges) return undefined;
+
+    return badges.filter(
+        (badge): badge is ChatBadge =>
+            badge === "winner" ||
+            badge === "spectating" ||
+            badge === "disconnected",
+    );
 }

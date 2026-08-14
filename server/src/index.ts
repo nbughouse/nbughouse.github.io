@@ -5,7 +5,7 @@ import fs from "node:fs";
 import http from "node:http";
 import { Server, Socket } from "socket.io";
 import { config } from "@shared/config";
-import { getPlayerDisplayName, Player } from "@shared/player";
+import { getPlayerDisplayName, Player, sanitizePlayerName } from "@shared/player";
 import type { Room } from "@shared/room";
 import { RoomStatus, Team } from "@shared/room";
 import path from "node:path";
@@ -125,9 +125,10 @@ io.on("connection", (socket: Socket) => {
     if (handshakePlayerID && handshakeToken) {
         const profile = profiles.get(handshakePlayerID);
         if (profile && profile.auth === handshakeToken) {
-            gameSocket.player = new Player(handshakePlayerID, profile.name);
+            const playerName = sanitizePlayerName(profile.name);
+            gameSocket.player = new Player(handshakePlayerID, playerName);
             recordPlayerSeen(handshakePlayerID);
-            profile.name = gameSocket.player.name;
+            profile.name = playerName;
             gameSocket.emit("sent-player", gameSocket.player.name);
         } else {
             issueFreshProfile(gameSocket);

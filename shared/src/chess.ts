@@ -7,6 +7,10 @@ export interface SerializedChess {
     whiteCastleLong: boolean;
     blackCastleShort: boolean;
     blackCastleLong: boolean;
+    whiteCastleShortRookCol?: number;
+    whiteCastleLongRookCol?: number;
+    blackCastleShortRookCol?: number;
+    blackCastleLongRookCol?: number;
     enPassantTarget: BoardPosition | undefined;
 }
 
@@ -25,6 +29,10 @@ export class Chess {
     whiteCastleLong: boolean = true;
     blackCastleShort: boolean = true;
     blackCastleLong: boolean = true;
+    whiteCastleShortRookCol: number = 7;
+    whiteCastleLongRookCol: number = 0;
+    blackCastleShortRookCol: number = 7;
+    blackCastleLongRookCol: number = 0;
     enPassantTarget: BoardPosition | undefined = undefined;
 
     constructor() {
@@ -41,6 +49,10 @@ export class Chess {
         chess.whiteCastleLong = this.whiteCastleLong;
         chess.blackCastleShort = this.blackCastleShort;
         chess.blackCastleLong = this.blackCastleLong;
+        chess.whiteCastleShortRookCol = this.whiteCastleShortRookCol;
+        chess.whiteCastleLongRookCol = this.whiteCastleLongRookCol;
+        chess.blackCastleShortRookCol = this.blackCastleShortRookCol;
+        chess.blackCastleLongRookCol = this.blackCastleLongRookCol;
         chess.enPassantTarget = this.enPassantTarget;
         return chess;
     }
@@ -61,6 +73,10 @@ export class Chess {
             whiteCastleLong: this.whiteCastleLong,
             blackCastleShort: this.blackCastleShort,
             blackCastleLong: this.blackCastleLong,
+            whiteCastleShortRookCol: this.whiteCastleShortRookCol,
+            whiteCastleLongRookCol: this.whiteCastleLongRookCol,
+            blackCastleShortRookCol: this.blackCastleShortRookCol,
+            blackCastleLongRookCol: this.blackCastleLongRookCol,
             enPassantTarget: this.enPassantTarget,
         };
     }
@@ -81,6 +97,10 @@ export class Chess {
         chess.whiteCastleLong = data.whiteCastleLong;
         chess.blackCastleShort = data.blackCastleShort;
         chess.blackCastleLong = data.blackCastleLong;
+        chess.whiteCastleShortRookCol = data.whiteCastleShortRookCol ?? 7;
+        chess.whiteCastleLongRookCol = data.whiteCastleLongRookCol ?? 0;
+        chess.blackCastleShortRookCol = data.blackCastleShortRookCol ?? 7;
+        chess.blackCastleLongRookCol = data.blackCastleLongRookCol ?? 0;
         chess.enPassantTarget = data.enPassantTarget;
         return chess;
     }
@@ -93,6 +113,11 @@ export class Chess {
         this.whiteCastleLong = true;
         this.blackCastleShort = true;
         this.blackCastleLong = true;
+        const castleRookCols = getCastleRookCols(backRank);
+        this.whiteCastleShortRookCol = castleRookCols.short;
+        this.whiteCastleLongRookCol = castleRookCols.long;
+        this.blackCastleShortRookCol = castleRookCols.short;
+        this.blackCastleLongRookCol = castleRookCols.long;
         this.enPassantTarget = undefined;
         this.board = createEmptyBoard();
 
@@ -115,10 +140,6 @@ export class Chess {
 
     resetRandom(): void {
         this.reset(randomBackRank());
-        this.whiteCastleShort = false;
-        this.whiteCastleLong = false;
-        this.blackCastleShort = false;
-        this.blackCastleLong = false;
     }
 
     getPocket(color: Color): Map<PieceType, number> {
@@ -270,21 +291,15 @@ export class Chess {
     }
 
     private canCastle(color: Color, side: CastleMove): boolean {
-        // Check if castling rights exist
-        if (color) {
-            if (side === CastleMove.SHORT && !this.whiteCastleShort)
-                return false;
-            if (side === CastleMove.LONG && !this.whiteCastleLong) return false;
-        } else {
-            if (side === CastleMove.SHORT && !this.blackCastleShort)
-                return false;
-            if (side === CastleMove.LONG && !this.blackCastleLong) return false;
-        }
+        if (!this.hasCastleRight(color, side)) return false;
 
         // Check if king and rook are in place
         const row = color ? 7 : 0;
-        const kingCol = 4;
-        const rookCol = side === CastleMove.SHORT ? 7 : 0;
+        const kingPos = this.findKing(color);
+        if (!kingPos || kingPos.row !== row) return false;
+
+        const kingCol = kingPos.col;
+        const rookCol = this.getCastleRookCol(color, side);
         const king = this.board[row][kingCol];
         const rook = this.board[row][rookCol];
 
@@ -296,25 +311,85 @@ export class Chess {
 
         if (this.isInCheck(color)) return false;
 
-        // Check if squares are empty and not under attack
-        const start = Math.min(kingCol, rookCol) + 1;
-        const end = Math.max(kingCol, rookCol);
         const enemyColor = invertColor(color);
         const kingDestinationCol = side === CastleMove.SHORT ? 6 : 2;
-        const step = side === CastleMove.SHORT ? 1 : -1;
+        const rookDestinationCol = side === CastleMove.SHORT ? 5 : 3;
 
-        for (
-            let col = kingCol;
-            col !== kingDestinationCol + step;
-            col += step
-        ) {
+        for (const col of colsBetween(kingCol, rookCol)) {
+            if (this.board[row][col]) return false;
+        }
+
+        for (const col of colsBetweenInclusive(kingCol, kingDestinationCol)) {
+            const occupiedByCastlingRook = col === rookCol;
             if (
-                (col >= start && col < end && this.board[row][col]) ||
-                this.isSquareAttacked({ loc: "board", row, col }, enemyColor)
+                col !== kingCol &&
+                !occupiedByCastlingRook &&
+                this.board[row][col]
+            )
+                return false;
+
+            if (this.isSquareAttacked({ loc: "board", row, col }, enemyColor))
+                return false;
+        }
+
+        for (const col of colsBetweenInclusive(rookCol, rookDestinationCol)) {
+            if (
+                col !== rookCol &&
+                col !== kingCol &&
+                this.board[row][col]
             )
                 return false;
         }
+
         return true;
+    }
+
+    private hasCastleRight(color: Color, side: CastleMove): boolean {
+        if (color)
+            return side === CastleMove.SHORT
+                ? this.whiteCastleShort
+                : this.whiteCastleLong;
+
+        return side === CastleMove.SHORT
+            ? this.blackCastleShort
+            : this.blackCastleLong;
+    }
+
+    private getCastleRookCol(color: Color, side: CastleMove): number {
+        if (color)
+            return side === CastleMove.SHORT
+                ? this.whiteCastleShortRookCol
+                : this.whiteCastleLongRookCol;
+
+        return side === CastleMove.SHORT
+            ? this.blackCastleShortRookCol
+            : this.blackCastleLongRookCol;
+    }
+
+    private getCastleSideForMove(
+        piece: Piece,
+        from: BoardPosition,
+        to: BoardPosition,
+    ): CastleMove | undefined {
+        if (piece.type !== PieceType.KING || from.row !== to.row) return;
+
+        const homeRank = piece.color ? 7 : 0;
+        if (from.row !== homeRank) return;
+
+        if (to.col === 6 && from.col !== to.col) return CastleMove.SHORT;
+        if (to.col === 2 && from.col !== to.col) return CastleMove.LONG;
+
+        if (
+            to.col === this.getCastleRookCol(piece.color, CastleMove.SHORT) &&
+            from.col !== to.col
+        )
+            return CastleMove.SHORT;
+
+        if (
+            to.col === this.getCastleRookCol(piece.color, CastleMove.LONG) &&
+            from.col !== to.col
+        )
+            return CastleMove.LONG;
     }
 
     private isEnPassantMove(from: BoardPosition, to: BoardPosition): boolean {
@@ -417,31 +492,8 @@ export class Chess {
                 if (rowDiff <= 1 && colDiff <= 1 && rowDiff + colDiff > 0)
                     return true;
 
-                // Castling
-                if (from.row === to.row && Math.abs(from.col - to.col) === 2) {
-                    const homeRank = piece.color ? 7 : 0;
-                    if (from.row !== homeRank || from.col !== 4) return false;
-
-                    const side =
-                        to.col > from.col ? CastleMove.SHORT : CastleMove.LONG;
-
-                    // Check castling rights
-                    if (piece.color) {
-                        if (side === CastleMove.SHORT && !this.whiteCastleShort)
-                            return false;
-
-                        if (side === CastleMove.LONG && !this.whiteCastleLong)
-                            return false;
-                    } else {
-                        if (side === CastleMove.SHORT && !this.blackCastleShort)
-                            return false;
-
-                        if (side === CastleMove.LONG && !this.blackCastleLong)
-                            return false;
-                    }
-
-                    return premove || this.canCastle(piece.color, side);
-                }
+                const side = this.getCastleSideForMove(piece, from, to);
+                if (side) return premove || this.canCastle(piece.color, side);
 
                 return false;
             }
@@ -474,10 +526,7 @@ export class Chess {
         )
             return MoveType.NORMAL;
 
-        if (
-            piece?.type === PieceType.KING &&
-            Math.abs(move.from.col - move.to.col) === 2
-        )
+        if (piece && this.getCastleSideForMove(piece, move.from, move.to))
             return MoveType.CASTLE;
 
         if (
@@ -506,6 +555,7 @@ export class Chess {
         if (!piece) return false;
 
         const targetPiece = this.board[to.row][to.col];
+        const castleSide = this.getCastleSideForMove(piece, from, to);
         if (
             targetPiece?.type === PieceType.KING &&
             !rules.allowKingCapture
@@ -519,6 +569,11 @@ export class Chess {
             if (
                 targetPiece &&
                 targetPiece.color === piece.color &&
+                !(
+                    castleSide &&
+                    targetPiece.type === PieceType.ROOK &&
+                    to.col === this.getCastleRookCol(piece.color, castleSide)
+                ) &&
                 !(rules.accolade && canCombinePieces(piece, targetPiece))
             )
                 return false;
@@ -530,6 +585,7 @@ export class Chess {
 
         // In premove mode, skip check validation
         if (premove) return true;
+        if (castleSide) return true;
         if (rules.allowKingCapture) return true;
 
         // Simulate the move to check if it leaves the king in check
@@ -651,12 +707,15 @@ export class Chess {
         if (!piece) return {};
 
         const targetPiece = this.board[to.row][to.col];
+        const castleSide = this.getCastleSideForMove(piece, from, to);
         const combining =
             rules.accolade && targetPiece
                 ? canCombinePieces(piece, targetPiece)
                 : false;
         let captured =
-            targetPiece?.type === PieceType.PROMOTED_QUEEN
+            castleSide
+                ? undefined
+                : targetPiece?.type === PieceType.PROMOTED_QUEEN
                 ? {
                       type: PieceType.PAWN,
                       color: targetPiece.color,
@@ -676,22 +735,20 @@ export class Chess {
         // Handle castling
         if (
             piece.type === PieceType.KING &&
-            Math.abs(from.col - to.col) === 2 &&
-            from.row === to.row
+            castleSide
         ) {
             const row = from.row;
-            const side = to.col > from.col ? CastleMove.SHORT : CastleMove.LONG;
-            const rookFromCol = side === CastleMove.SHORT ? 7 : 0;
+            const side = castleSide;
+            const kingToCol = side === CastleMove.SHORT ? 6 : 2;
+            const rookFromCol = this.getCastleRookCol(piece.color, side);
             const rookToCol = side === CastleMove.SHORT ? 5 : 3;
-
-            // Move king
-            this.board[to.row][to.col] = piece;
-            this.board[from.row][from.col] = undefined;
-
-            // Move rook
             const rook = this.board[row][rookFromCol];
-            this.board[row][rookToCol] = rook;
+
+            this.board[row][from.col] = undefined;
             this.board[row][rookFromCol] = undefined;
+
+            this.board[row][kingToCol] = piece;
+            this.board[row][rookToCol] = rook;
         } else {
             // Normal move
             this.board[to.row][to.col] =
@@ -749,13 +806,22 @@ export class Chess {
 
         if (piece.type === PieceType.ROOK) {
             if (piece.color) {
-                if (from.row === 7 && from.col === 7)
+                if (from.row === 7 && from.col === this.whiteCastleShortRookCol)
                     this.whiteCastleShort = false;
-                else if (from.row === 7 && from.col === 0)
+                else if (
+                    from.row === 7 &&
+                    from.col === this.whiteCastleLongRookCol
+                )
                     this.whiteCastleLong = false;
-            } else if (from.row === 0 && from.col === 7) {
+            } else if (
+                from.row === 0 &&
+                from.col === this.blackCastleShortRookCol
+            ) {
                 this.blackCastleShort = false;
-            } else if (from.row === 0 && from.col === 0) {
+            } else if (
+                from.row === 0 &&
+                from.col === this.blackCastleLongRookCol
+            ) {
                 this.blackCastleLong = false;
             }
         }
@@ -763,12 +829,22 @@ export class Chess {
         // If a rook is captured, remove castling rights
         if (captured && captured.type === PieceType.ROOK) {
             if (captured.color) {
-                if (to.row === 7 && to.col === 7) this.whiteCastleShort = false;
-                else if (to.row === 7 && to.col === 0)
+                if (to.row === 7 && to.col === this.whiteCastleShortRookCol)
+                    this.whiteCastleShort = false;
+                else if (
+                    to.row === 7 &&
+                    to.col === this.whiteCastleLongRookCol
+                )
                     this.whiteCastleLong = false;
-            } else if (to.row === 0 && to.col === 7) {
+            } else if (
+                to.row === 0 &&
+                to.col === this.blackCastleShortRookCol
+            ) {
                 this.blackCastleShort = false;
-            } else if (to.row === 0 && to.col === 0) {
+            } else if (
+                to.row === 0 &&
+                to.col === this.blackCastleLongRookCol
+            ) {
                 this.blackCastleLong = false;
             }
         }
@@ -911,6 +987,41 @@ function defaultBackRank(): PieceType[] {
         PieceType.KNIGHT,
         PieceType.ROOK,
     ];
+}
+
+function getCastleRookCols(backRank: PieceType[]): {
+    short: number;
+    long: number;
+} {
+    const kingCol = backRank.indexOf(PieceType.KING);
+    const rookCols = backRank.flatMap((piece, col) =>
+        piece === PieceType.ROOK ? [col] : [],
+    );
+    let long = 0;
+    for (const col of rookCols) {
+        if (col < kingCol) long = col;
+    }
+
+    return {
+        short: rookCols.find((col) => col > kingCol) ?? 7,
+        long,
+    };
+}
+
+function colsBetween(firstCol: number, secondCol: number): number[] {
+    const start = Math.min(firstCol, secondCol) + 1;
+    const end = Math.max(firstCol, secondCol);
+    const cols: number[] = [];
+    for (let col = start; col < end; col++) cols.push(col);
+    return cols;
+}
+
+function colsBetweenInclusive(firstCol: number, secondCol: number): number[] {
+    const step = firstCol <= secondCol ? 1 : -1;
+    const cols: number[] = [];
+    for (let col = firstCol; col !== secondCol + step; col += step)
+        cols.push(col);
+    return cols;
 }
 
 function randomBackRank(): PieceType[] {
