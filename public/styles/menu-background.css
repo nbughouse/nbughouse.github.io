@@ -41,13 +41,6 @@
    pointer-events: none;
 }
 
-.menu-piece-probe {
-   position: absolute;
-   width: 0;
-   height: 0;
-   overflow: hidden;
-}
-
 .menu-gallery-lane {
    min-width: 0;
    height: 100%;
@@ -83,6 +76,14 @@
    flex: none;
    width: calc(var(--square-size) * 8);
    height: calc(var(--square-size) * 8);
+}
+
+.menu-gallery-piece {
+   width: 100%;
+   height: 100%;
+   background-repeat: no-repeat;
+   background-position: center;
+   background-size: contain;
 }
 
 @keyframes menu-gallery-up {

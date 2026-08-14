@@ -3,6 +3,7 @@ import { sn } from "./session";
 import { boardThemes } from "./settings";
 
 const svgNamespace = "http://www.w3.org/2000/svg";
+const htmlNamespace = "http://www.w3.org/1999/xhtml";
 const pieceScale = 0.941;
 const pieceInset = (1 - pieceScale) / 2;
 let boardClipIndex = 0;
@@ -16,9 +17,6 @@ const backRank = [
     "knight",
     "rook",
 ] as const;
-const pieceTypes = ["pawn", ...new Set(backRank)] as const;
-type PieceName = (typeof pieceTypes)[number];
-
 export function initMenuBackground(): void {
     const boardscape = document.querySelector<HTMLElement>("#menu-boardscape");
     if (!boardscape || boardscape.childElementCount > 0) return;
@@ -47,14 +45,13 @@ export function initMenuBackground(): void {
 }
 
 export function refreshMenuBackground(): void {
-    const pieceImages = getPieceImages();
     for (const board of document.querySelectorAll<SVGSVGElement>(
         ".menu-gallery-board",
     )) {
         board.replaceChildren();
         const content = appendBoardClip(board);
         appendBoardArtwork(content);
-        appendStartingPosition(content, pieceImages);
+        appendStartingPosition(content);
     }
 }
 
@@ -130,61 +127,33 @@ function appendBoardArtwork(board: SVGGElement): void {
     board.append(lightSquares, darkSquares);
 }
 
-function appendStartingPosition(
-    board: SVGGElement,
-    pieceImages: ReadonlyMap<string, string>,
-): void {
+function appendStartingPosition(board: SVGGElement): void {
     for (let column = 0; column < 8; column++) {
-        appendPiece(
-            board,
-            pieceImages.get(`${backRank[column]}-black`),
-            0,
-            column,
-        );
-        appendPiece(board, pieceImages.get("pawn-black"), 1, column);
-        appendPiece(board, pieceImages.get("pawn-white"), 6, column);
-        appendPiece(
-            board,
-            pieceImages.get(`${backRank[column]}-white`),
-            7,
-            column,
-        );
+        appendPiece(board, backRank[column], "black", 0, column);
+        appendPiece(board, "pawn", "black", 1, column);
+        appendPiece(board, "pawn", "white", 6, column);
+        appendPiece(board, backRank[column], "white", 7, column);
     }
 }
 
 function appendPiece(
     board: SVGGElement,
-    href: string | undefined,
+    type: string,
+    color: "white" | "black",
     row: number,
     column: number,
 ): void {
-    if (!href) return;
+    // Theme pieces are CSS background images. Keeping that image on an HTML
+    // element avoids loading an SVG data URL as a nested SVG <image>, which is
+    // unreliable in some browsers for larger themes such as Alpha and Companion.
+    const container = document.createElementNS(svgNamespace, "foreignObject");
+    container.setAttribute("x", (column + pieceInset).toString());
+    container.setAttribute("y", (row + pieceInset).toString());
+    container.setAttribute("width", pieceScale.toString());
+    container.setAttribute("height", pieceScale.toString());
 
-    const image = document.createElementNS(svgNamespace, "image");
-    image.setAttribute("href", href);
-    image.setAttribute("x", (column + pieceInset).toString());
-    image.setAttribute("y", (row + pieceInset).toString());
-    image.setAttribute("width", pieceScale.toString());
-    image.setAttribute("height", pieceScale.toString());
-    image.setAttribute("preserveAspectRatio", "xMidYMid meet");
-    board.append(image);
-}
-
-function getPieceImages(): Map<string, string> {
-    const images = new Map<string, string>();
-    const probe = document.createElement("div");
-    probe.classList.add("menu-piece-probe");
-    document.body.append(probe);
-
-    for (const color of ["white", "black"] as const) {
-        for (const type of pieceTypes) {
-            probe.className = `menu-piece-probe piece ${type} ${color}`;
-            const backgroundImage = getComputedStyle(probe).backgroundImage;
-            const match = /^url\(["']?(.*?)["']?\)$/.exec(backgroundImage);
-            if (match) images.set(`${type}-${color}`, match[1]);
-        }
-    }
-
-    probe.remove();
-    return images;
+    const piece = document.createElementNS(htmlNamespace, "div");
+    piece.classList.add("menu-gallery-piece", "piece", type, color);
+    container.append(piece);
+    board.append(container);
 }
