@@ -1,4 +1,5 @@
-import { refreshDualBoardLayout, stopPingUpdates } from "./game-ui";
+import { refreshDualBoardLayout } from "./game-ui";
+import { stopPingUpdates } from "./sidebar-ui";
 import { stopTimeUpdates } from "./match-ui";
 import { roomExists } from "./room-api";
 import { setStoredProfileValue, sn } from "./session";

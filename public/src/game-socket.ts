@@ -14,13 +14,15 @@ import {
     refreshDualBoardLayout,
     showRoomElements,
     startGameUI,
+} from "./game-ui";
+import {
     updateUIAllChat,
     updateStartButton,
     updateRoomSettingsUI,
     updateUIPlayerList,
     updateUIPushChat,
     getPlayerPlaqueAppearance,
-} from "./game-ui";
+} from "./sidebar-ui";
 import { showError, showMenuScreen } from "./menu-ui";
 import {
     clearLastMoves,

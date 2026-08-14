@@ -3,6 +3,7 @@ import { initGameControls } from "./game-ui";
 import { initMenuSocket } from "./menu-socket";
 import { initMenuControls } from "./menu-ui";
 import { initSession } from "./session";
+import { initSidebarControls } from "./sidebar-ui";
 import { checkURLForRoom } from "./url";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -12,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
         initMenuControls();
         initGameSocket();
         initGameControls();
+        initSidebarControls();
 
         const checkRoomURLAfterProfileLoads = () => {
             session.socket.off(
