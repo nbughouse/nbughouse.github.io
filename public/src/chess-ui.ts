@@ -91,6 +91,17 @@ function resetMarks(matchIndex: number): void {
     };
 }
 
+function clearManualAnnotations(matchIndex: number): void {
+    const marks = visualChessStates.get(matchIndex)?.marks;
+    if (!marks) return;
+
+    marks.marked = Array.from({ length: 8 }, () =>
+        Array.from({ length: 8 }, () => false),
+    );
+    marks.arrows = [];
+    updateAnnotations(matchIndex);
+}
+
 function updateVisualChessState(matchIndex: number): void {
     const match = gs.room.game.matches[matchIndex];
     const chess = gs.room.game.getFinalChess(matchIndex);
@@ -1170,6 +1181,12 @@ function getVisualSquareCenter(
 }
 
 function updateArrowAnnotations(boardID: number): void {
+    const tileLength = 12.5;
+    const startOffset = tileLength * 0.35;
+    const shaftWidth = tileLength * 0.25;
+    const headWidth = tileLength * 0.55;
+    const headLength = tileLength * 0.4;
+
     const boardElement = document.querySelector(
         `.board[data-id="${boardID}"]`,
     ) as HTMLElement;
@@ -1192,9 +1209,10 @@ function updateArrowAnnotations(boardID: number): void {
         const unitY = dy / length;
         const normalX = -unitY;
         const normalY = unitX;
-        const shaftHalfWidth = 1.3;
-        const headLength = Math.min(4.2, length * 0.34);
-        const headHalfWidth = headLength;
+        const startX = from.x + unitX * startOffset;
+        const startY = from.y + unitY * startOffset;
+        const shaftHalfWidth = shaftWidth / 2;
+        const headHalfWidth = headWidth / 2;
         const headBaseX = to.x - unitX * headLength;
         const headBaseY = to.y - unitY * headLength;
 
@@ -1207,8 +1225,8 @@ function updateArrowAnnotations(boardID: number): void {
             "points",
             [
                 [
-                    from.x + normalX * shaftHalfWidth,
-                    from.y + normalY * shaftHalfWidth,
+                    startX + normalX * shaftHalfWidth,
+                    startY + normalY * shaftHalfWidth,
                 ],
                 [
                     headBaseX + normalX * shaftHalfWidth,
@@ -1228,8 +1246,8 @@ function updateArrowAnnotations(boardID: number): void {
                     headBaseY - normalY * shaftHalfWidth,
                 ],
                 [
-                    from.x - normalX * shaftHalfWidth,
-                    from.y - normalY * shaftHalfWidth,
+                    startX - normalX * shaftHalfWidth,
+                    startY - normalY * shaftHalfWidth,
                 ],
             ]
                 .map(([x, y]) => `${x},${y}`)
@@ -1315,6 +1333,8 @@ function handleSquareMouseDown(event: MouseEvent): void {
         deselectPiece();
         return;
     }
+
+    clearManualAnnotations(id);
 
     if (gs.settings.movementMode === "click" && selected?.dragElement)
         dropSelectedPiece();
@@ -1448,6 +1468,8 @@ function handlePocketMouseDown(event: MouseEvent): void {
     const { pos, id } = getPositionFromElement(target);
 
     event.preventDefault();
+
+    clearManualAnnotations(id);
 
     selectPiece(id, pos);
     if (
