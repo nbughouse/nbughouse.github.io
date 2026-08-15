@@ -22,9 +22,9 @@ import {
 } from "./chat-ui";
 import {
     updateStartButton,
-    updateRoomSettingsUI,
     updateUIPlayerList,
 } from "./sidebar-ui";
+import { updateRoomSettingsUI } from "./room-settings-ui";
 import { showError, showMenuScreen } from "./menu-ui";
 import {
     clearLastMoves,

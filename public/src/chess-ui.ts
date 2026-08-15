@@ -190,6 +190,9 @@ function getPieceClassNames(piece: Piece): string[] {
 export function createPieceElement(piece: Piece): HTMLDivElement {
     const element = document.createElement("div");
     element.className = getPieceClassNames(piece).join(" ");
+    element.dataset.pieceType = piece.type;
+    element.dataset.pieceColor = piece.color.toString();
+    if (piece.combinedWith) element.dataset.combinedWith = piece.combinedWith;
 
     if (piece.combinedWith) {
         const badgeType =
@@ -209,6 +212,71 @@ export function createPieceElement(piece: Piece): HTMLDivElement {
     }
 
     return element;
+}
+
+function pieceElementMatches(element: HTMLElement, piece: Piece): boolean {
+    return (
+        element.dataset.pieceType === piece.type &&
+        element.dataset.pieceColor === piece.color.toString() &&
+        (element.dataset.combinedWith || undefined) === piece.combinedWith
+    );
+}
+
+function syncSquareLabel(
+    square: HTMLElement,
+    className: "rank-label" | "file-label",
+    text: string | undefined,
+): void {
+    const existing = square.querySelector<HTMLElement>(
+        `:scope > .${className}`,
+    );
+
+    if (text === undefined) {
+        existing?.remove();
+        return;
+    }
+
+    if (existing) {
+        existing.textContent = text;
+        return;
+    }
+
+    const label = document.createElement("div");
+    label.className = className;
+    label.textContent = text;
+    square.prepend(label);
+}
+
+function syncSquarePiece(
+    square: HTMLElement,
+    piece: Piece | undefined,
+    hidden: boolean,
+    replaceAnimating: boolean,
+): void {
+    const elements = Array.from(
+        square.querySelectorAll<HTMLElement>(":scope > .piece"),
+    );
+    let element = elements[0];
+
+    if (!piece) {
+        for (const current of elements) current.remove();
+        return;
+    }
+
+    if (
+        !element ||
+        !pieceElementMatches(element, piece) ||
+        (replaceAnimating &&
+            (element.classList.contains("animating") ||
+                element.classList.contains("accolade-combine-result")))
+    ) {
+        for (const current of elements) current.remove();
+        element = createPieceElement(piece);
+        element.addEventListener("dragstart", () => false);
+        square.append(element);
+    }
+
+    element.style.opacity = hidden ? "0" : "";
 }
 
 function setPositionToElement(element: HTMLElement, id: number, pos: Position) {
@@ -640,6 +708,8 @@ export function updateUIChess(id: number): void {
 
     const squares = boardElement.querySelectorAll(`.square`);
     const flipped = isFlipped(id);
+    const replaceAnimatingPieces =
+        lastMoveAnimationSerials.get(id) !== animatedMoveSerials.get(id);
 
     for (const [index, square] of squares.entries()) {
         const element = square as HTMLElement;
@@ -655,29 +725,25 @@ export function updateUIChess(id: number): void {
         element.style.setProperty("--board-file", visualCol.toString());
         setPositionToElement(element, id, pos);
 
-        element.innerHTML = "";
-
         const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
-        if (gs.settings.showBoardCoords && visualCol === 0) {
-            const rankLabel = document.createElement("div");
-
-            rankLabel.className = "rank-label";
-            rankLabel.textContent = (8 - row).toString();
-            element.append(rankLabel);
-        }
-
-        if (gs.settings.showBoardCoords && visualRow === 7) {
-            const fileLabel = document.createElement("div");
-            fileLabel.className = "file-label";
-            fileLabel.textContent = files[col];
-            element.append(fileLabel);
-        }
+        syncSquareLabel(
+            element,
+            "rank-label",
+            gs.settings.showBoardCoords && visualCol === 0
+                ? (8 - row).toString()
+                : undefined,
+        );
+        syncSquareLabel(
+            element,
+            "file-label",
+            gs.settings.showBoardCoords && visualRow === 7
+                ? files[col]
+                : undefined,
+        );
 
         const piece = chess.getPiece(pos);
         if (piece) {
-            const pieceElement = createPieceElement(piece);
-
             const isMyTurn = chess.turn === piece.color;
             const isMyPiece =
                 gs.room.status === RoomStatus.PLAYING &&
@@ -690,19 +756,16 @@ export function updateUIChess(id: number): void {
                     ? "grab"
                     : "default";
 
-            // Hide piece if it's currently selected and being held
-            if (
+            const hidden = Boolean(
                 selected &&
-                selected.dragElement &&
-                selected.boardID === id &&
-                positionsEqual(selected.pos, pos)
-            )
-                pieceElement.style.opacity = "0";
-
-            pieceElement.addEventListener("dragstart", () => false);
-            element.append(pieceElement);
+                    selected.dragElement &&
+                    selected.boardID === id &&
+                    positionsEqual(selected.pos, pos),
+            );
+            syncSquarePiece(element, piece, hidden, replaceAnimatingPieces);
         } else {
             element.style.cursor = "default";
+            syncSquarePiece(element, undefined, false, replaceAnimatingPieces);
         }
     }
 
