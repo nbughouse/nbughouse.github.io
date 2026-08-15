@@ -40,17 +40,9 @@ function initSidebarTabs(): void {
     const settingsTabButton = document.querySelector("#settings-tab-btn");
     const playersPanel = document.querySelector("#players-tab-panel");
     const settingsPanel = document.querySelector("#settings-tab-panel");
-    const chatSection = document.querySelector("#chat-section");
 
     playersTabButton?.addEventListener("click", () => {
-        sidebarTabs?.classList.remove("settings-active");
-        playersTabButton.classList.add("active");
-        settingsTabButton?.classList.remove("active");
-        playersPanel?.classList.remove("hidden");
-        settingsPanel?.classList.add("hidden");
-        setMoreRoomSettingsOpen(false);
-        setRoomVariantsOpen(false);
-        chatSection?.classList.remove("hidden");
+        resetSidebarUI();
     });
 
     settingsTabButton?.addEventListener("click", () => {
@@ -152,7 +144,7 @@ export function showSidebarRoomElements(): void {
     const gameRoomCode = document.querySelector("#game-room-code") as HTMLButtonElement;
     gameRoomCode.textContent = gs.room.code || "";
 
-    showPlayersTab();
+    resetSidebarUI();
     updateRoomSettingsUI();
     initPingIndicator();
     resetGameButtons();
@@ -181,7 +173,7 @@ function copyRoomLink(): void {
     input.remove();
 }
 
-function showPlayersTab(): void {
+export function resetSidebarUI(): void {
     const sidebarTabs = document.querySelector("#sidebar-tabs");
     const playersTabButton = document.querySelector("#players-tab-btn");
     const settingsTabButton = document.querySelector("#settings-tab-btn");
@@ -195,6 +187,7 @@ function showPlayersTab(): void {
     playersPanel?.classList.remove("hidden");
     settingsPanel?.classList.add("hidden");
     setMoreRoomSettingsOpen(false);
+    setRoomVariantsOpen(false);
     chatSection?.classList.remove("hidden");
 }
 

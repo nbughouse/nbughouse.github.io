@@ -1,5 +1,5 @@
 import { refreshDualBoardLayout } from "./game-ui";
-import { stopPingUpdates } from "./sidebar-ui";
+import { resetSidebarUI, stopPingUpdates } from "./sidebar-ui";
 import { stopTimeUpdates } from "./match-ui";
 import { roomExists } from "./room-api";
 import { setStoredProfileValue, sn } from "./session";
@@ -937,6 +937,7 @@ export function showScreen(screenId: string): void {
 }
 
 export function showMenuScreen(updateHistory = true): void {
+    resetSidebarUI();
     showScreen("menu");
     showMainMenuView(updateHistory);
     clearErrors();
