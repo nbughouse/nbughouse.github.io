@@ -172,8 +172,7 @@ export class Room {
         if (this.status !== RoomStatus.LOBBY) return false;
 
         if (
-            this.game.config.playerAssignment === "random" &&
-            !randomizeMatchPlayers(
+            !fillEmptyMatchPlayers(
                 this.game.matches,
                 this.connectedPlayers(),
             )
@@ -664,6 +663,62 @@ export function randomizeMatchPlayers(
     return true;
 }
 
+/**
+ * Keeps manually selected seats and randomly fills the remaining seats with
+ * connected players. A player may occupy several seats, but never both teams.
+ */
+export function fillEmptyMatchPlayers(
+    matches: Match[],
+    availablePlayers: Player[],
+    random: () => number = Math.random,
+): boolean {
+    const connectedByID = new Map(
+        availablePlayers
+            .filter((player) => player.status === PlayerStatus.CONNECTED)
+            .map((player) => [player.id, player]),
+    );
+    const teamByPlayerID = new Map<string, Team>();
+
+    for (const match of matches) {
+        for (const team of [Team.RED, Team.BLUE]) {
+            const player = match.getPlayerTeam(team);
+            if (!player) continue;
+            if (!connectedByID.has(player.id)) {
+                setMatchPlayerTeam(match, team, undefined);
+                continue;
+            }
+
+            const existingTeam = teamByPlayerID.get(player.id);
+            if (existingTeam && existingTeam !== team) return false;
+            teamByPlayerID.set(player.id, team);
+        }
+    }
+
+    for (const team of [Team.RED, Team.BLUE]) {
+        const candidates = shuffle(
+            [...connectedByID.values()].filter(
+                (player) => teamByPlayerID.get(player.id) !== oppositeTeam(team),
+            ),
+            random,
+        );
+        if (candidates.length === 0) return false;
+
+        let candidateIndex = 0;
+        for (const match of matches) {
+            if (match.getPlayerTeam(team)) continue;
+            const player = candidates[candidateIndex++ % candidates.length];
+            teamByPlayerID.set(player.id, team);
+            setMatchPlayerTeam(match, team, player);
+        }
+    }
+
+    return matches.every((match) => match.whitePlayer && match.blackPlayer);
+}
+
+function oppositeTeam(team: Team): Team {
+    return team === Team.RED ? Team.BLUE : Team.RED;
+}
+
 function assignTeamBoards(
     matches: Match[],
     team: Team,
@@ -682,7 +737,11 @@ function assignTeamBoards(
     }
 }
 
-function setMatchPlayerTeam(match: Match, team: Team, player: Player): void {
+function setMatchPlayerTeam(
+    match: Match,
+    team: Team,
+    player: Player | undefined,
+): void {
     if ((team === Team.BLUE) === match.flipped) match.whitePlayer = player;
     else match.blackPlayer = player;
 }

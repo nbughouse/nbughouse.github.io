@@ -305,6 +305,26 @@ export function updateUIPlayerList(): void {
             playerDiv.className =
                 `player-item ${statusClasses.join(" ")} ${relationshipClass}`.trim();
             playerDiv.dataset.playerId = id;
+            const canHostAssign =
+                gs.room.hostID === gs.player.id &&
+                gs.room.status === RoomStatus.LOBBY &&
+                player.status !== PlayerStatus.DISCONNECTED;
+            playerDiv.draggable = canHostAssign;
+            if (canHostAssign) {
+                playerDiv.classList.add("assignable-player");
+                playerDiv.addEventListener("dragstart", (event) => {
+                    event.dataTransfer?.setData("application/x-player-id", id);
+                    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+                    document.body.classList.add("assigning-player");
+                });
+                playerDiv.addEventListener("dragend", () => {
+                    document.body.classList.remove("assigning-player");
+                    for (const target of document.querySelectorAll(
+                        ".player-seat-drop-target",
+                    ))
+                        target.classList.remove("player-seat-drop-target");
+                });
+            }
             nameDiv.className = "player-name";
             nameDiv.textContent = getPlayerDisplayName(player);
             if (id === gs.room.hostID) {

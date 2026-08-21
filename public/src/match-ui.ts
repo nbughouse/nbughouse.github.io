@@ -88,6 +88,7 @@ function createPocketRowElements(
     const info = document.createElement("div");
     info.className = "player-info";
     info.id = `${side}-info-${boardID}`;
+    info.dataset.boardId = boardID.toString();
 
     const timeDifference = document.createElement("div");
     timeDifference.className = "player-time-difference";
@@ -146,6 +147,13 @@ export function createMatchElements(boardID: number): void {
     const bottomRow = createPocketRowElements(boardID, "bottom");
     boardContainer.append(bottomRow);
 
+    for (const side of ["top", "bottom"] as const) {
+        const dropZone = document.createElement("div");
+        dropZone.className = `player-seat-drop-zone player-seat-drop-zone-${side}`;
+        dropZone.setAttribute("aria-hidden", "true");
+        boardContainer.append(dropZone);
+    }
+
     boardsArea.append(boardContainer);
 }
 
@@ -192,6 +200,7 @@ function updateUIPlayerSlot(
         "open-player-seat",
         !player && gs.room.status === RoomStatus.LOBBY,
     );
+    playerInfo.dataset.color = color;
     playerInfo.classList.toggle(
         "own-player-seat",
         Boolean(
@@ -205,6 +214,37 @@ function updateUIPlayerSlot(
     playerInfo.onkeydown = null;
     playerInfo.removeAttribute("role");
     playerInfo.removeAttribute("tabindex");
+    const dropZone = playerInfo
+        .closest(".match-container")
+        ?.querySelector<HTMLElement>(`.player-seat-drop-zone-${side}`);
+    if (dropZone) {
+        dropZone.ondragover = null;
+        dropZone.ondragleave = null;
+        dropZone.ondrop = null;
+    }
+
+    const canHostAssign =
+        gs.room.hostID === gs.player.id &&
+        gs.room.status === RoomStatus.LOBBY;
+    if (canHostAssign && dropZone) {
+        dropZone.ondragover = (event) => {
+            if (!event.dataTransfer?.types.includes("application/x-player-id"))
+                return;
+            event.preventDefault();
+            dropZone.classList.add("player-seat-drop-target");
+        };
+        dropZone.ondragleave = () =>
+            dropZone.classList.remove("player-seat-drop-target");
+        dropZone.ondrop = (event) => {
+            event.preventDefault();
+            dropZone.classList.remove("player-seat-drop-target");
+            const playerID = event.dataTransfer?.getData(
+                "application/x-player-id",
+            );
+            if (playerID)
+                gs.socket.emit("assign-player-board", playerID, boardID, color);
+        };
+    }
 
     if (
         player?.id === gs.player.id &&

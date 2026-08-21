@@ -7,6 +7,7 @@
 	"scripts": {
 		"build": "npm run build:shared && npm run build:fix-esm && npm run build:client && npm run build:server && npm run build:alias",
 		"build:frontend": "npm run build:shared && npm run build:fix-esm && npm run build:client",
+		"build:pages": "npm run build:frontend && cp dist/public/index.html dist/public/404.html && touch dist/public/.nojekyll",
 		"build:backend": "npm run build:shared && npm run build:fix-esm && npm run build:server && npm run build:alias",
 		"build:client": "vite build",
 		"build:server": "cd server && tsc --build tsconfig.build.json",

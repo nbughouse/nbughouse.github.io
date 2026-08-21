@@ -207,6 +207,43 @@ export function setupHandlers(socket: GameSocket): void {
         );
     });
 
+    socket.on(
+        "assign-player-board",
+        (playerID: string, boardID: number, color: Color) => {
+            const room = socket.room;
+            if (
+                !room ||
+                room.status !== RoomStatus.LOBBY ||
+                room.hostID !== socket.player.id ||
+                typeof playerID !== "string" ||
+                !Number.isInteger(boardID) ||
+                (color !== Color.WHITE && color !== Color.BLACK)
+            )
+                return;
+
+            const board = room.game.matches[boardID];
+            const player = room.getPlayer(playerID);
+            if (!board || !player || player.status === PlayerStatus.DISCONNECTED)
+                return;
+
+            const team = board.getTeam(color);
+            const opposingTeam = team === Team.RED ? Team.BLUE : Team.RED;
+            for (const match of room.game.matches)
+                if (match.getPlayerTeam(opposingTeam)?.id === playerID) return;
+
+            const wasSpectating = player.status === PlayerStatus.SPECTATING;
+            player.status = PlayerStatus.CONNECTED;
+            board.setPlayer(player, color);
+            if (wasSpectating)
+                io.to(room.code).emit(
+                    "p-set-status",
+                    playerID,
+                    PlayerStatus.CONNECTED,
+                );
+            io.to(room.code).emit("p-joined-board", playerID, boardID, color);
+        },
+    );
+
     socket.on("move-board", (boardID: number, color: Color, move: Move) => {
         if (!socket.room || socket.room.status !== RoomStatus.PLAYING) return;
 

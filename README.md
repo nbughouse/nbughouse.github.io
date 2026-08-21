@@ -112,6 +112,25 @@ Backend variables:
 
 ## Deployment
 
+### GitHub Pages Frontend
+
+The frontend can also be deployed as a static GitHub Pages site while using the
+production backend at `https://nbug.app`.
+
+The workflow in `.github/workflows/pages.yml` builds `dist/public` and deploys
+it to Pages on pushes to `main` or from a manual workflow run. It sets
+`VITE_BASE_PATH` to `/<repo-name>/`, which matches GitHub project Pages URLs.
+
+Optional repository variable:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `VITE_BACKEND_URL` | `https://nbug.app` | Backend origin used by the Pages frontend for API and Socket.IO. |
+
+If the Pages site uses a different origin than `https://nbug.app`, add that
+origin to the backend with `ALLOWED_ORIGINS` or `FRONTEND_ORIGIN` so API and
+Socket.IO requests are accepted.
+
 ### VM
 
 The app deploys from `.github/workflows/deploy.yml` on pushes to `main`.

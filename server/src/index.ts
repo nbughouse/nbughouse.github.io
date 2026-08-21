@@ -217,8 +217,6 @@ function isHttpOriginAllowed(origin: string | undefined): boolean {
 function getAllowedOrigins(): Set<string> {
     const origins = new Set([
         "https://nbug.app",
-        "https://nbughouse.github.io",
-        "https://nbughouse.duckdns.org",
         `http://localhost:${config.clientPort}`,
         `http://127.0.0.1:${config.clientPort}`,
         `http://localhost:${config.serverPort}`,

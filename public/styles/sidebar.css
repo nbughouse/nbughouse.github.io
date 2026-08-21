@@ -65,8 +65,8 @@
    height: 1.9vh;
    transform: translate(-50%, -50%);
    background: currentColor;
-   -webkit-mask: url("/assets/img/open-arrow-left.svg") center / contain no-repeat;
-   mask: url("/assets/img/open-arrow-left.svg") center / contain no-repeat;
+   -webkit-mask: url("../assets/img/open-arrow-left.svg") center / contain no-repeat;
+   mask: url("../assets/img/open-arrow-left.svg") center / contain no-repeat;
 }
 
 /* Ping Indicator */
@@ -227,6 +227,14 @@
    opacity: 0.4;
 }
 
+.player-item.assignable-player {
+   cursor: grab;
+}
+
+.player-item.assignable-player:active {
+   cursor: grabbing;
+}
+
 .spectating-icon {
    flex: 0 0 auto;
    width: 2vh;
@@ -238,8 +246,8 @@
    background: var(--yellow);
    width: 2vh;
    height: 2vh;
-   -webkit-mask: url("/assets/img/disconnected.svg") center / contain no-repeat;
-   mask: url("/assets/img/disconnected.svg") center / contain no-repeat;
+   -webkit-mask: url("../assets/img/disconnected.svg") center / contain no-repeat;
+   mask: url("../assets/img/disconnected.svg") center / contain no-repeat;
 }
 
 .player-stats {

@@ -361,7 +361,7 @@ function saveRoomSettings(): void {
         timeBonus,
         timeType: timeTypeSelect.value as TimeType,
         timeShared: timeSharedInput.checked,
-        playerAssignment: "random",
+        playerAssignment: gs.room.game.config.playerAssignment,
         initialBoard: getInitialBoardSetting(
             initialBoardModeSelect,
             initialBoardFenInput,
