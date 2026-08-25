@@ -1,4 +1,5 @@
 import { Color } from "@shared/chess";
+import { isKungFuInitialBoard } from "@shared/config";
 import {
     getPlayerDisplayName,
     type Player,
@@ -11,12 +12,15 @@ import {
     createPocketElement,
     updateUIChess,
 } from "./chess-ui";
+import { playSound } from "./sound-ui";
 import { gs } from "./session";
 import { getAssetPath } from "./app-paths";
 
 export let visualFlipped: boolean = false;
 let intervalID: number;
 let latestWinningPlayerIds = new Set<string>();
+let lowTimeWarnings = new Set<string>();
+const lowTimeWarningThreshold = 30_000;
 
 export function rememberLatestWinners(team: Team): void {
     latestWinningPlayerIds = new Set();
@@ -29,6 +33,10 @@ export function rememberLatestWinners(team: Team): void {
 
 export function clearLatestWinners(): void {
     latestWinningPlayerIds = new Set();
+}
+
+export function resetLowTimeWarnings(): void {
+    lowTimeWarnings = new Set();
 }
 
 export function isLatestWinner(playerID: string): boolean {
@@ -76,6 +84,10 @@ function formatTime(time: number): string {
 function formatTimeDifference(time: number): string {
     const sign = time > 0 ? "+" : time < 0 ? "-" : "";
     return `${sign}${formatTime(Math.abs(time))}`;
+}
+
+export function areClientClocksEnabled(): boolean {
+    return !isKungFuInitialBoard(gs.room.game.config.initialBoard);
 }
 
 function createPocketRowElements(
@@ -200,7 +212,7 @@ function updateUIPlayerSlot(
         "open-player-seat",
         !player && gs.room.status === RoomStatus.LOBBY,
     );
-    playerInfo.dataset.color = color;
+    playerInfo.dataset.color = String(color);
     playerInfo.classList.toggle(
         "own-player-seat",
         Boolean(
@@ -358,6 +370,22 @@ function updateTimeDisplay(
     const timeDifference = playerInfo.querySelector(
         ".player-time-difference",
     ) as HTMLElement;
+    const clocksEnabled = areClientClocksEnabled();
+
+    timeDisplay.hidden = !clocksEnabled;
+    timeDifference.hidden = !clocksEnabled;
+
+    if (!clocksEnabled) {
+        timeValue.textContent = "";
+        timeDifference.textContent = "";
+        timeDisplay.classList.remove(
+            "white-clock",
+            "black-clock",
+            "active-clock",
+        );
+        playerInfo.classList.remove("active-player");
+        return;
+    }
 
     timeValue.textContent = formatTime(time);
     timeDifference.textContent = formatTeamTimeDifference(boardID, color, time);
@@ -411,14 +439,50 @@ function getTeamTime(match: Match, team: Team): number {
 }
 
 export function updateTimeLeft(currentTime: number = Date.now()): void {
+    if (!areClientClocksEnabled()) return;
+
     for (let index = 0; index < gs.room.game.matches.length; index++) {
         const matchInstance = getMatchInstance(index);
+        const previousWhiteTime = matchInstance.whiteTime;
+        const previousBlackTime = matchInstance.blackTime;
         matchInstance.updateTime(currentTime);
+        maybePlayLowTimeWarning(
+            index,
+            Color.WHITE,
+            previousWhiteTime,
+            matchInstance.whiteTime,
+        );
+        maybePlayLowTimeWarning(
+            index,
+            Color.BLACK,
+            previousBlackTime,
+            matchInstance.blackTime,
+        );
     }
+}
+
+function maybePlayLowTimeWarning(
+    boardID: number,
+    color: Color,
+    previousTime: number,
+    currentTime: number,
+): void {
+    const match = getMatchInstance(boardID);
+    if (match.chess.turn !== color) return;
+    if (match.getPlayer(color)?.id !== gs.player.id) return;
+    if (previousTime < lowTimeWarningThreshold) return;
+    if (currentTime >= lowTimeWarningThreshold) return;
+
+    const key = `${boardID}:${color}`;
+    if (lowTimeWarnings.has(key)) return;
+
+    lowTimeWarnings.add(key);
+    playSound("lowTime");
 }
 
 export function startTimeUpdates(): void {
     stopTimeUpdates();
+    if (!areClientClocksEnabled()) return;
 
     intervalID = globalThis.setInterval(() => {
         updateTimeLeft();

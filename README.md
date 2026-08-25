@@ -182,6 +182,10 @@ scripts/      Build helper scripts
 dist/         Generated build output
 ```
 
+## Credits
+
+Sounds and chess assets are credited to [Lichess](https://lichess.org).
+
 ## Gameplay Flow
 
 1. Enter a player name.

@@ -1,6 +1,6 @@
 import { sanitizeChatMessage } from "@shared/chat";
 import { Color, type Move } from "@shared/chess";
-import type { GameConfig } from "@shared/config";
+import { isKungFuInitialBoard, type GameConfig } from "@shared/config";
 import {
     getPlayerDisplayName,
     isValidPlayerName,
@@ -248,16 +248,25 @@ export function setupHandlers(socket: GameSocket): void {
         if (!socket.room || socket.room.status !== RoomStatus.PLAYING) return;
 
         const board = socket.room.game.matches[boardID];
+        if (!board || (color !== Color.WHITE && color !== Color.BLACK)) return;
 
+        const currentTime = Date.now();
+        const movingPiece = board.chess.getPiece(move.from);
         if (
             board.getPlayer(color)?.id !== socket.player.id ||
-            !board.chess.isLegal(move, false, socket.room.game.getMoveRules())
+            movingPiece?.color !== color ||
+            !board.chess.isLegal(move, false, socket.room.game.getMoveRules()) ||
+            !socket.room.game.canMove(boardID, move, currentTime)
         )
             return;
 
-        const currentTime = Date.now();
-        board.updateTime(currentTime);
-        socket.room.game.doMove(boardID, move);
+        const capturedKingWinner = socket.room.game.checkCapturedKing(
+            boardID,
+            move,
+        );
+        if (!isKungFuInitialBoard(socket.room.game.config.initialBoard))
+            board.updateTime(currentTime);
+        socket.room.game.doMove(boardID, move, currentTime);
 
         io.to(socket.room.code).emit(
             "p-moved-board",
@@ -266,20 +275,24 @@ export function setupHandlers(socket: GameSocket): void {
             currentTime,
         );
 
-        const kingWinner = socket.room.game.checkKingAccumulation();
+        const kingWinner =
+            capturedKingWinner ?? socket.room.game.checkKingAccumulation();
         if (kingWinner) {
+            const kingCaptureReason = capturedKingWinner
+                ? "captured the king"
+                : "captured all kings";
             recordCompletedGame(socket.room);
             socket.room.endRoom(kingWinner);
             recordRoomServerChat(
                 socket.room,
                 `Team ${kingWinner} won! ${
                     kingWinner === Team.BLUE ? "Blue" : "Red"
-                } captured all kings!`,
+                } ${kingCaptureReason}!`,
             );
             io.to(socket.room.code).emit(
                 "ended-room",
                 kingWinner,
-                `${kingWinner === Team.BLUE ? "Blue" : "Red"} captured all kings!`,
+                `${kingWinner === Team.BLUE ? "Blue" : "Red"} ${kingCaptureReason}!`,
                 currentTime,
             );
             io.to(socket.room.code).emit(

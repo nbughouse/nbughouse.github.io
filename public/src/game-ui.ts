@@ -1,6 +1,5 @@
 import { Color } from "@shared/chess";
 import { RoomStatus } from "@shared/room";
-import { getAssetPath } from "./app-paths";
 import {
     clearLatestWinners,
     createMatchElements,
@@ -8,7 +7,6 @@ import {
     toggleVisualFlipped,
     updateUIAllGame,
 } from "./match-ui";
-import { soundThemes, type SoundName } from "./settings";
 import {
     endSidebarGameUI,
     showSidebarRoomElements,
@@ -53,20 +51,6 @@ export function initGameControls(): void {
             navigateBoards(1);
         }
     });
-}
-
-export function playSound(source: SoundName): void {
-    if (!gs.settings.sounds) return;
-
-    const soundTheme =
-        soundThemes.find((theme) => theme.id === gs.settings.soundTheme) ||
-        soundThemes[0];
-    const file = soundTheme.sounds[source] || soundTheme.sounds.move;
-    if (!file) return;
-
-    const sound = new Audio(getAssetPath(`sound/${soundTheme.id}/${file}`));
-    console.log(`Playing sound: ${soundTheme.id}/${file}`);
-    sound.play().catch((error) => console.error("Sound play failed:", error));
 }
 
 export function showRoomElements(): void {

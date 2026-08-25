@@ -1,5 +1,5 @@
 import { sanitizeChatMessage } from "@shared/chat";
-import { type Color, type Move } from "@shared/chess";
+import { Color, type Move, positionsEqual } from "@shared/chess";
 import { Player, sanitizePlayerName, type PlayerStatus } from "@shared/player";
 import {
     Room,
@@ -32,15 +32,18 @@ import {
     suppressMoveAnimation,
 } from "./chess-ui";
 import {
+    areClientClocksEnabled,
     startTimeUpdates,
     stopTimeUpdates,
     rememberLatestWinners,
+    resetLowTimeWarnings,
     updateUIAllBoards,
     updateUIAllPlayers,
     updateUIPlayers,
     updateUITime,
 } from "./match-ui";
 import { gs } from "./session";
+import { playSound } from "./sound-ui";
 import { updateURL } from "./url";
 
 export function initGameSocket(): void {
@@ -48,6 +51,7 @@ export function initGameSocket(): void {
         const room = Room.deserialize(raw);
 
         gs.room = room;
+        resetLowTimeWarnings();
 
         showRoomElements();
         updateUIPlayerList();
@@ -159,43 +163,57 @@ export function initGameSocket(): void {
         gs.room.setGame(raw);
         for (const match of gs.room.game.matches) match.lastMoveTime = timeStarted;
         clearLastMoves();
+        resetLowTimeWarnings();
+        playSound("newChallenge");
         startGameUI();
         updateUIPlayerList();
         updateUIAllChat();
         startTimeUpdates();
-
     });
 
     gs.socket.on(
         "p-moved-board",
         (boardID: number, move: Move, newTime: number) => {
             const currentMatch = gs.room.game.matches[boardID];
+            const rules = gs.room.game.getMoveRules();
 
-            currentMatch.updateTime(newTime);
+            if (areClientClocksEnabled()) currentMatch.updateTime(newTime);
 
-            if (currentMatch.queued.color === currentMatch.chess.turn)
+            if (
+                rules.turnless &&
+                currentMatch.queued.moves[0] &&
+                movesEqual(currentMatch.queued.moves[0], move)
+            )
+                currentMatch.queued.moves.shift();
+            else if (
+                !rules.turnless &&
+                currentMatch.queued.color === currentMatch.chess.turn
+            )
                 currentMatch.queued.moves.shift();
 
             rememberLastMove(boardID, move);
-            gs.room.game.doMove(boardID, move);
+            gs.room.game.doMove(boardID, move, newTime);
 
             for (const match of gs.room.game.matches) {
                 if (match.queued.moves.length === 0) continue;
                 if (
                     !match.chess.isLegal(
                         match.queued.moves[0],
-                        match.queued.color !== match.chess.turn,
-                        gs.room.game.getMoveRules(),
+                        rules.turnless
+                            ? false
+                            : match.queued.color !== match.chess.turn,
+                        rules,
                     )
                 )
                     match.queued.moves.length = 0;
             }
 
-            currentMatch.updateTime(Date.now());
+            if (areClientClocksEnabled()) currentMatch.updateTime(Date.now());
             updateUITime();
             updateUIAllBoards();
 
             if (
+                !rules.turnless &&
                 currentMatch.queued.moves[0] &&
                 currentMatch.chess.isLegal(
                     currentMatch.queued.moves[0],
@@ -214,22 +232,30 @@ export function initGameSocket(): void {
         },
     );
 
-    gs.socket.on("ended-room", (team: Team, reason: string, time: number) => {
-        for (const match of gs.room.game.matches) match.updateTime(time);
+    gs.socket.on(
+        "ended-room",
+        (team: Team | undefined, reason: string, time: number) => {
+            if (areClientClocksEnabled())
+                for (const match of gs.room.game.matches)
+                    match.updateTime(time);
 
-        rememberLatestWinners(team);
-        gs.room.endRoom(team);
-        clearLastMoves();
-        endGameUI();
-        stopTimeUpdates();
-        updateUITime();
-        updateUIPlayerList();
-        updateUIPushChat({
-            id: "server",
-            message: `Team ${team} won! ${reason}`,
-        });
-
-    });
+            playEndRoomSound(team);
+            if (team) rememberLatestWinners(team);
+            gs.room.endRoom(team);
+            clearLastMoves();
+            resetLowTimeWarnings();
+            endGameUI();
+            stopTimeUpdates();
+            updateUITime();
+            updateUIPlayerList();
+            updateUIPushChat({
+                id: "server",
+                message: team
+                    ? `Team ${team} won! ${reason}`
+                    : `Game ended. ${reason}`,
+            });
+        },
+    );
 
     gs.socket.on(
         "p-sent-chat",
@@ -245,5 +271,35 @@ export function initGameSocket(): void {
             );
             updateUIPushChat(chatMessage);
         },
+    );
+}
+
+function playEndRoomSound(team: Team | undefined): void {
+    if (!team) {
+        playSound("draw");
+        return;
+    }
+
+    const localTeam = getLocalPlayerTeam();
+    if (!localTeam) return;
+
+    playSound(localTeam === team ? "victory" : "defeat");
+}
+
+function getLocalPlayerTeam(): Team | undefined {
+    for (const match of gs.room.game.matches) {
+        if (match.whitePlayer?.id === gs.player.id)
+            return match.getTeam(Color.WHITE);
+        if (match.blackPlayer?.id === gs.player.id)
+            return match.getTeam(Color.BLACK);
+    }
+    return undefined;
+}
+
+function movesEqual(first: Move, second: Move): boolean {
+    return (
+        positionsEqual(first.from, second.from) &&
+        positionsEqual(first.to, second.to) &&
+        first.promotion === second.promotion
     );
 }

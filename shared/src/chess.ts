@@ -2,6 +2,9 @@ export interface SerializedChess {
     board: Board;
     whitePocket: Record<PieceType, number>;
     blackPocket: Record<PieceType, number>;
+    boardCooldowns?: number[][];
+    whitePocketCooldown?: number;
+    blackPocketCooldown?: number;
     turn: Color;
     whiteCastleShort: boolean;
     whiteCastleLong: boolean;
@@ -18,12 +21,18 @@ export interface MoveRules {
     allowKingCapture?: boolean;
     forcePocketKingDrop?: boolean;
     accolade?: boolean;
+    dropAggression?: "no-check" | "no-mate" | "mate";
+    /** Allow either color to move without changing the alternating turn. */
+    turnless?: boolean;
 }
 
 export class Chess {
     board: Board = [];
     whitePocket: Map<PieceType, number> = new Map();
     blackPocket: Map<PieceType, number> = new Map();
+    boardCooldowns: number[][] = createCooldownBoard();
+    whitePocketCooldown: number = 0;
+    blackPocketCooldown: number = 0;
     turn: Color = Color.WHITE;
     whiteCastleShort: boolean = true;
     whiteCastleLong: boolean = true;
@@ -44,6 +53,9 @@ export class Chess {
         chess.board = this.board.map((row) => [...row]);
         chess.whitePocket = new Map(this.whitePocket);
         chess.blackPocket = new Map(this.blackPocket);
+        chess.boardCooldowns = this.boardCooldowns.map((row) => [...row]);
+        chess.whitePocketCooldown = this.whitePocketCooldown;
+        chess.blackPocketCooldown = this.blackPocketCooldown;
         chess.turn = this.turn;
         chess.whiteCastleShort = this.whiteCastleShort;
         chess.whiteCastleLong = this.whiteCastleLong;
@@ -68,6 +80,9 @@ export class Chess {
                 PieceType,
                 number
             >,
+            boardCooldowns: this.boardCooldowns,
+            whitePocketCooldown: this.whitePocketCooldown,
+            blackPocketCooldown: this.blackPocketCooldown,
             turn: this.turn,
             whiteCastleShort: this.whiteCastleShort,
             whiteCastleLong: this.whiteCastleLong,
@@ -92,6 +107,9 @@ export class Chess {
         for (const [key, value] of Object.entries(data.blackPocket))
             chess.blackPocket.set(key as PieceType, value);
 
+        chess.boardCooldowns = normalizeCooldownBoard(data.boardCooldowns);
+        chess.whitePocketCooldown = data.whitePocketCooldown ?? 0;
+        chess.blackPocketCooldown = data.blackPocketCooldown ?? 0;
         chess.turn = data.turn;
         chess.whiteCastleShort = data.whiteCastleShort;
         chess.whiteCastleLong = data.whiteCastleLong;
@@ -108,6 +126,9 @@ export class Chess {
     reset(backRank: PieceType[] = defaultBackRank()): void {
         this.whitePocket = new Map();
         this.blackPocket = new Map();
+        this.boardCooldowns = createCooldownBoard();
+        this.whitePocketCooldown = 0;
+        this.blackPocketCooldown = 0;
         this.turn = Color.WHITE;
         this.whiteCastleShort = true;
         this.whiteCastleLong = true;
@@ -154,6 +175,28 @@ export class Chess {
             const count = pocket.get(pos.type) || 0;
             return count > 0 ? { type: pos.type, color: pos.color } : undefined;
         }
+    }
+
+    getBoardCooldown(pos: BoardPosition): number {
+        return this.boardCooldowns[pos.row]?.[pos.col] ?? 0;
+    }
+
+    setBoardCooldown(pos: BoardPosition, readyAt: number): void {
+        this.boardCooldowns[pos.row][pos.col] = readyAt;
+    }
+
+    getPocketCooldown(color: Color): number {
+        return color ? this.whitePocketCooldown : this.blackPocketCooldown;
+    }
+
+    setPocketCooldown(color: Color, readyAt: number): void {
+        if (color) this.whitePocketCooldown = readyAt;
+        else this.blackPocketCooldown = readyAt;
+    }
+
+    canMoveFrom(pos: Position, currentTime: number): boolean {
+        if (pos.loc === "board") return this.getBoardCooldown(pos) <= currentTime;
+        return this.getPocketCooldown(pos.color) <= currentTime;
     }
 
     addToPocket(piece: Piece): void {
@@ -577,7 +620,7 @@ export class Chess {
         )
             return false;
 
-        if (this.turn !== piece.color) return false;
+        if (!rules.turnless && this.turn !== piece.color) return false;
 
         if (
             targetPiece &&
@@ -648,7 +691,7 @@ export class Chess {
         // In premove mode, skip turn and check validation
         if (premove) return true;
 
-        if (this.turn !== from.color) return false;
+        if (!rules.turnless && this.turn !== from.color) return false;
 
         const targetPiece = this.board[to.row][to.col];
         const droppedPiece = { type: from.type, color: from.color };
@@ -657,16 +700,26 @@ export class Chess {
             !(rules.accolade && canCombinePieces(droppedPiece, targetPiece))
         )
             return false;
-        if (rules.allowKingCapture) return true;
-
         this.board[to.row][to.col] = targetPiece
             ? combinePieces(droppedPiece, targetPiece)
             : droppedPiece;
 
         const inCheck = this.isInCheck(from.color);
+        const dropChecks = this.isInCheck(invertColor(from.color));
+        const dropMates =
+            dropChecks &&
+            rules.dropAggression === "no-mate" &&
+            this.isCheckmateFor(invertColor(from.color), rules);
 
         this.board[to.row][to.col] = targetPiece;
 
+        if (
+            rules.dropAggression === "no-check" && dropChecks ||
+            rules.dropAggression === "no-mate" && dropMates
+        )
+            return false;
+
+        if (rules.allowKingCapture) return true;
         return !inCheck;
     }
 
@@ -689,7 +742,14 @@ export class Chess {
             : this.isLegalMove(move.from, move.to, premove, rules);
     }
 
-    doMove(move: Move, premove = false, rules: MoveRules = {}): MoveResult {
+    doMove(
+        move: Move,
+        premove = false,
+        rules: MoveRules = {},
+        currentTime: number = Date.now(),
+        pieceCooldown = 0,
+        pocketCooldown = 0,
+    ): MoveResult {
         if (move.to.loc === "pocket") return {};
 
         const from = move.from;
@@ -708,8 +768,10 @@ export class Chess {
 
             this.removeFromPocket(from.type, from.color);
             this.enPassantTarget = undefined;
+            this.setBoardCooldown(to, currentTime + pieceCooldown);
+            this.setPocketCooldown(from.color, currentTime + pocketCooldown);
 
-            if (!premove) this.turn = invertColor(this.turn);
+            if (!premove && !rules.turnless) this.turn = invertColor(this.turn);
             return {};
         }
 
@@ -783,6 +845,28 @@ export class Chess {
             };
         } else {
             this.enPassantTarget = undefined;
+        }
+
+        this.setBoardCooldown(from, 0);
+        if (castleSide) {
+            const row = from.row;
+            const kingToCol = castleSide === CastleMove.SHORT ? 6 : 2;
+            const rookFromCol = this.getCastleRookCol(piece.color, castleSide);
+            const rookToCol = castleSide === CastleMove.SHORT ? 5 : 3;
+            this.setBoardCooldown(
+                { loc: "board", row, col: rookFromCol },
+                0,
+            );
+            this.setBoardCooldown(
+                { loc: "board", row, col: kingToCol },
+                currentTime + pieceCooldown,
+            );
+            this.setBoardCooldown(
+                { loc: "board", row, col: rookToCol },
+                currentTime + pieceCooldown,
+            );
+        } else {
+            this.setBoardCooldown(to, currentTime + pieceCooldown);
         }
 
         let promoted: PieceType | undefined;
@@ -861,18 +945,25 @@ export class Chess {
             }
         }
 
-        if (!premove) this.turn = invertColor(this.turn);
+        if (!premove && !rules.turnless) this.turn = invertColor(this.turn);
         return { captured, promoted };
     }
 
-    isCheckmate(): boolean {
-        if (!this.isInCheck(this.turn)) return false;
+    isCheckmate(rules: MoveRules = {}): boolean {
+        return this.isCheckmateFor(this.turn, rules);
+    }
+
+    private isCheckmateFor(color: Color, rules: MoveRules = {}): boolean {
+        if (!this.isInCheck(color)) return false;
+
+        const originalTurn = this.turn;
+        this.turn = color;
 
         // Try all possible moves for the current player
         for (let fromRow = 0; fromRow < 8; fromRow++) {
             for (let fromCol = 0; fromCol < 8; fromCol++) {
                 const piece = this.board[fromRow][fromCol];
-                if (!piece || piece.color !== this.turn) continue;
+                if (!piece || piece.color !== color) continue;
 
                 // Try moving this piece to all squares
                 for (let toRow = 0; toRow < 8; toRow++) {
@@ -889,13 +980,16 @@ export class Chess {
                         };
 
                         // Found a legal move, not checkmate
-                        if (this.isLegalMove(from, to)) return false;
+                        if (this.isLegalMove(from, to, false, rules)) {
+                            this.turn = originalTurn;
+                            return false;
+                        }
                     }
                 }
             }
         }
 
-        const testDropPiece = { type: PieceType.QUEEN, color: this.turn };
+        const testDropPiece = { type: PieceType.QUEEN, color };
 
         for (let row = 0; row < 8; row++) {
             for (let col = 0; col < 8; col++) {
@@ -904,6 +998,7 @@ export class Chess {
                 this.board[row][col] = testDropPiece;
                 if (!this.isInCheck(this.turn)) {
                     this.board[row][col] = undefined;
+                    this.turn = originalTurn;
                     return false;
                 }
 
@@ -911,6 +1006,7 @@ export class Chess {
             }
         }
 
+        this.turn = originalTurn;
         return true;
     }
 }
@@ -985,6 +1081,27 @@ function createEmptyBoard(): Board {
         board[row] = [];
         for (let col = 0; col < 8; col++) board[row][col] = undefined;
     }
+    return board;
+}
+
+function createCooldownBoard(): number[][] {
+    return Array.from({ length: 8 }, () =>
+        Array.from({ length: 8 }, () => 0),
+    );
+}
+
+function normalizeCooldownBoard(data: number[][] | undefined): number[][] {
+    const board = createCooldownBoard();
+    if (!Array.isArray(data)) return board;
+
+    for (let row = 0; row < 8; row++) {
+        if (!Array.isArray(data[row])) continue;
+        for (let col = 0; col < 8; col++) {
+            const value = data[row][col];
+            board[row][col] = Number.isFinite(value) ? value : 0;
+        }
+    }
+
     return board;
 }
 

@@ -122,6 +122,13 @@
 									<li>Matches end by checkmate, resignation, or timeout.</li>
 								</ul>
 							</section>
+							<section class="help-block">
+								<h3>Credits</h3>
+								<p>
+									Sounds and chess assets are credited to
+									<a href="https://lichess.org" target="_blank" rel="noopener noreferrer">Lichess</a>.
+								</p>
+							</section>
 							<a id="github-link" class="button-3d" href="https://github.com/nbughouse/nbughouse"
 								target="_blank" rel="noopener noreferrer" draggable="false">
 								View GitHub repository
@@ -319,16 +326,18 @@
 							</select>
 						</label>
 						<label class="settings-field">
+							<span>Piece cooldown</span>
+							<input type="number" id="setting-piece-cooldown" min="0" max="3600" step="1" />
+						</label>
+						<label class="settings-field">
+							<span>Pocket cooldown</span>
+							<input type="number" id="setting-pocket-cooldown" min="0" max="3600" step="1" />
+						</label>
+						<label class="settings-field">
 							<span>Start</span>
 							<select id="setting-initial-board-mode">
 								<option value="default">Default</option>
 								<option value="960">Chess960</option>
-								<option value="koedem">Koedem</option>
-								<option value="accolade">Accolade</option>
-								<option value="960+koedem">Chess960 + Koedem</option>
-								<option value="960+accolade">Chess960 + Accolade</option>
-								<option value="koedem+accolade">Koedem + Accolade</option>
-								<option value="960+koedem+accolade">Chess960 + Koedem + Accolade</option>
 								<option value="custom">Custom FEN</option>
 							</select>
 						</label>
@@ -378,6 +387,11 @@
 						aria-label="Koedem" title="Koedem">
 						<img src="%BASE_URL%assets/img/chess-king.svg" alt="" aria-hidden="true" />
 						<span aria-hidden="true">Koedem</span>
+					</button>
+					<button class="room-variant-button" type="button" data-initial-board="taijitu" aria-pressed="false"
+						aria-label="Kung Fu" title="Kung Fu">
+						<img src="%BASE_URL%assets/img/taijitu.svg" alt="" aria-hidden="true" />
+						<span aria-hidden="true">Kung Fu</span>
 					</button>
 					<button class="room-variant-button" type="button" data-initial-board="accolade" aria-pressed="false"
 						aria-label="Accolade" title="Combine a knight with a bishop, rook, or queen">

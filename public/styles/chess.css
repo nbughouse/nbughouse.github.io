@@ -152,6 +152,16 @@
    height: calc(var(--square-size) * 0.941);
 }
 
+.pocket-piece.cooling .piece {
+   opacity: 0.45;
+   filter: grayscale(0.35);
+}
+
+.square.cooling,
+.pocket-piece.cooling .piece {
+   cursor: default !important;
+}
+
 .pocket-piece.highlight {
    border-radius: var(--radius-sm);
    background-color: rgba(245, 197, 74, 0.82);
@@ -272,6 +282,17 @@
    align-items: center;
    width: var(--square-size);
    height: var(--square-size);
+}
+
+.cooldown-overlay {
+   position: absolute;
+   inset: 0;
+   z-index: 6;
+   transform-origin: bottom;
+   background: rgba(255, 204, 54, 0.58);
+   box-shadow: inset 0 0 0 calc(var(--square-size) * 0.025) rgba(255, 226, 109, 0.28);
+   pointer-events: none;
+   will-change: transform;
 }
 
 .square.light {
@@ -553,6 +574,11 @@
    font-size: calc(var(--square-size) * 0.32);
    line-height: 1;
    box-shadow: var(--shadow-bottom);
+}
+
+.player-time-difference[hidden],
+.player-time-display[hidden] {
+   display: none;
 }
 
 .player-time-display.white-clock {

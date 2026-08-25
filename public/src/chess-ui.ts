@@ -11,7 +11,7 @@ import {
     positionsEqual,
 } from "@shared/chess";
 import { RoomStatus } from "@shared/room";
-import { playSound } from "./game-ui";
+import { playSound } from "./sound-ui";
 import { visualFlipped } from "./match-ui";
 import { gs } from "./session";
 import { getAssetPath } from "./app-paths";
@@ -63,6 +63,7 @@ const lastMoveAnimationPieces: Map<
         suppressTravel: boolean;
     }
 > = new Map();
+const cooldownRefreshTimers: Map<number, number> = new Map();
 let nextMoveAnimationSerial = 1;
 
 interface BoardArrow {
@@ -178,6 +179,11 @@ function isMyPiece(boardID: number, piece: Piece): boolean {
     );
 }
 
+function canUsePositionNow(boardID: number, pos: Position): boolean {
+    if (!gs.room.game.getMoveRules().turnless) return true;
+    return getVisualChess(boardID).chess.canMoveFrom(pos, Date.now());
+}
+
 function getPieceClassNames(piece: Piece): string[] {
     const pieceClassByType: Record<PieceType, string> = {
         [PieceType.KING]: "king",
@@ -288,6 +294,43 @@ function syncSquarePiece(
     }
 
     element.style.opacity = hidden ? "0" : "";
+}
+
+function syncSquareCooldownOverlay(
+    square: HTMLElement,
+    readyAt: number,
+    duration: number,
+): void {
+    let overlay = square.querySelector<HTMLElement>(
+        ":scope > .cooldown-overlay",
+    );
+
+    if (readyAt <= Date.now()) {
+        overlay?.remove();
+        return;
+    }
+
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.className = "cooldown-overlay";
+        overlay.setAttribute("aria-hidden", "true");
+        square.append(overlay);
+    }
+
+    const remaining = readyAt - Date.now();
+    const progress = Number.isFinite(readyAt)
+        ? Math.min(1, Math.max(0, remaining / Math.max(1, duration)))
+        : 1;
+
+    overlay.style.transition = "none";
+    overlay.style.transform = `scaleY(${progress})`;
+
+    if (!Number.isFinite(readyAt)) return;
+
+    // Commit the current fill before starting the drain toward zero.
+    void overlay.offsetHeight;
+    overlay.style.transition = `transform ${Math.max(0, remaining)}ms linear`;
+    overlay.style.transform = "scaleY(0)";
 }
 
 function setPositionToElement(element: HTMLElement, id: number, pos: Position) {
@@ -505,7 +548,7 @@ function showPromotionDialog(
         PieceType.KNIGHT,
         PieceType.ROOK,
         PieceType.BISHOP,
-    ];
+    ] as const;
 
     const pieceNames: Record<(typeof pieces)[number], string> = {
         [PieceType.QUEEN]: "queen",
@@ -624,6 +667,7 @@ function selectPiece(id: number, pos: Position): void {
     const piece = getVisualChess(id).chess.getPiece(pos);
 
     if (!piece) return;
+    if (!canUsePositionNow(id, pos)) return;
 
     selected = {
         boardID: id,
@@ -652,6 +696,7 @@ function deselectPiece(): void {
 function executeMove(id: number, move: Move, premove: boolean): void {
     const board = getVisualChess(id).chess;
     const rules = gs.room.game.getMoveRules();
+    if (rules.turnless) premove = false;
 
     if (!premove) gs.socket.emit("move-board", id, selected!.piece.color, move);
 
@@ -672,10 +717,13 @@ function attemptMove(id: number, to: Position): boolean {
     };
 
     const board = getVisualChess(id).chess;
-    const premove = board.turn !== board.getPiece(move.from)?.color;
+    const rules = gs.room.game.getMoveRules();
+    const premove =
+        !rules.turnless && board.turn !== board.getPiece(move.from)?.color;
 
     if (premove && !gs.settings.premoves) return false;
-    if (!board.isLegal(move, premove, gs.room.game.getMoveRules())) return false;
+    if (!canUsePositionNow(id, move.from)) return false;
+    if (!board.isLegal(move, premove, rules)) return false;
 
     // Check if this is a promotion move
     if (
@@ -760,12 +808,24 @@ export function updateUIChess(id: number): void {
                 gs.room.status === RoomStatus.PLAYING &&
                 gs.room.game.matches[id].getPlayer(piece.color)?.id ===
                     gs.player.id;
+            const cooling = !canUsePositionNow(id, pos);
 
-            const canMoveNow = isMyPiece && (isMyTurn || gs.settings.premoves);
+            const canMoveNow =
+                isMyPiece &&
+                !cooling &&
+                (gs.room.game.getMoveRules().turnless ||
+                    isMyTurn ||
+                    gs.settings.premoves);
             element.style.cursor =
                 canMoveNow && gs.settings.movementMode !== "click"
                     ? "grab"
                     : "default";
+            element.classList.toggle("cooling", cooling);
+            syncSquareCooldownOverlay(
+                element,
+                chess.getBoardCooldown(pos),
+                gs.room.game.config.pieceCooldown * 1000,
+            );
 
             const hidden = Boolean(
                 selected &&
@@ -776,6 +836,8 @@ export function updateUIChess(id: number): void {
             syncSquarePiece(element, piece, hidden, replaceAnimatingPieces);
         } else {
             element.style.cursor = "default";
+            element.classList.remove("cooling");
+            syncSquareCooldownOverlay(element, 0, 0);
             syncSquarePiece(element, undefined, false, replaceAnimatingPieces);
         }
     }
@@ -794,6 +856,7 @@ export function updateUIChess(id: number): void {
     );
 
     updateAnnotations(id);
+    scheduleCooldownRefresh(id);
 }
 
 function animateLastMove(boardID: number): void {
@@ -1029,17 +1092,20 @@ function updatePocket(
 
             pieceElement.className = "pocket-piece";
             pieceElement.dataset.id = boardID.toString();
-
-            const pieceView = createPieceElement({ type: pieceType, color });
-
-            setPositionToElement(pieceView, boardID, {
+            const pos: Position = {
                 loc: "pocket",
                 type: pieceType,
                 color,
-            });
+            };
+            const cooling = !canUsePositionNow(boardID, pos);
+            pieceElement.classList.toggle("cooling", cooling);
+
+            const pieceView = createPieceElement({ type: pieceType, color });
+
+            setPositionToElement(pieceView, boardID, pos);
             pieceView.addEventListener("dragstart", () => false);
 
-            if (isMyPiece) {
+            if (isMyPiece && !cooling) {
                 pieceView.style.cursor = "grab";
                 pieceView.addEventListener("mousedown", handlePocketMouseDown);
                 pieceView.addEventListener("mouseup", handlePocketMouseUp);
@@ -1060,6 +1126,36 @@ function updatePocket(
             pocket.append(pieceElement);
         }
     }
+}
+
+function scheduleCooldownRefresh(boardID: number): void {
+    window.clearTimeout(cooldownRefreshTimers.get(boardID));
+    cooldownRefreshTimers.delete(boardID);
+
+    const chess = gs.room.game.matches[boardID]?.chess;
+    if (!chess) return;
+
+    const now = Date.now();
+    let nextReadyAt = Infinity;
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const readyAt = chess.boardCooldowns[row][col];
+            if (readyAt > now && readyAt < nextReadyAt) nextReadyAt = readyAt;
+        }
+    }
+
+    for (const readyAt of [chess.whitePocketCooldown, chess.blackPocketCooldown])
+        if (readyAt > now && readyAt < nextReadyAt) nextReadyAt = readyAt;
+
+    if (!Number.isFinite(nextReadyAt)) return;
+
+    cooldownRefreshTimers.set(
+        boardID,
+        window.setTimeout(() => {
+            cooldownRefreshTimers.delete(boardID);
+            updateUIChess(boardID);
+        }, Math.max(0, nextReadyAt - now) + 25),
+    );
 }
 
 function annotateSquare(
@@ -1138,13 +1234,19 @@ function updateAnnotations(id: number): void {
         pocketPiece.classList.add("highlight");
     }
 
-    const premove = chess.getPiece(pos)?.color !== chess.turn;
+    const rules = gs.room.game.getMoveRules();
+    const premove =
+        !rules.turnless && chess.getPiece(pos)?.color !== chess.turn;
 
-    if (gs.settings.showLegalMoves && (!premove || gs.settings.premoves)) {
+    if (
+        gs.settings.showLegalMoves &&
+        canUsePositionNow(id, pos) &&
+        (!premove || gs.settings.premoves)
+    ) {
         for (let r = 0; r < 8; r++) {
             for (let c = 0; c < 8; c++) {
                 const move = { from: pos, to: createPosition(r, c) };
-                if (chess.isLegal(move, premove, gs.room.game.getMoveRules()))
+                if (chess.isLegal(move, premove, rules))
                     annotateSquare(id, r, c, ["legal-move"]);
             }
         }
@@ -1303,6 +1405,9 @@ export function clearLastMoves(): void {
     animatedMoveSerials.clear();
     suppressedMoveAnimations.clear();
     lastMoveAnimationPieces.clear();
+    for (const timer of cooldownRefreshTimers.values())
+        window.clearTimeout(timer);
+    cooldownRefreshTimers.clear();
     closePromotionDialog();
 }
 
@@ -1347,7 +1452,10 @@ function handleSquareMouseDown(event: MouseEvent): void {
     const canSelectTarget =
         targetPiece &&
         isMyPiece(id, targetPiece) &&
-        (gs.settings.premoves || board.turn === targetPiece.color);
+        canUsePositionNow(id, pos) &&
+        (gs.room.game.getMoveRules().turnless ||
+            gs.settings.premoves ||
+            board.turn === targetPiece.color);
 
     if (selected?.boardID === id) {
         const moved =
@@ -1394,12 +1502,18 @@ function handleSquareMouseUp(event: MouseEvent): void {
     };
 
     const board = getVisualChess(id).chess;
-    const premove = board.turn !== board.getPiece(move.from)?.color;
+    const rules = gs.room.game.getMoveRules();
+    const premove =
+        !rules.turnless && board.turn !== board.getPiece(move.from)?.color;
     if (premove && !gs.settings.premoves) {
         dropSelectedPiece();
         return;
     }
-    const result = board.isLegal(move, premove, gs.room.game.getMoveRules());
+    if (!canUsePositionNow(id, move.from)) {
+        dropSelectedPiece();
+        return;
+    }
+    const result = board.isLegal(move, premove, rules);
 
     if (result && gs.settings.movementMode !== "click") {
         // Check if this is a promotion move
@@ -1473,6 +1587,7 @@ function handlePocketMouseDown(event: MouseEvent): void {
 
     selectPiece(id, pos);
     if (
+        !gs.room.game.getMoveRules().turnless &&
         !gs.settings.premoves &&
         getVisualChess(id).chess.turn !== selected?.piece.color
     ) {

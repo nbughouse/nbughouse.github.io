@@ -10,6 +10,19 @@ export type PocketShare = "color" | "shared" | "none";
 export type DropAggression = "no-check" | "no-mate" | "mate";
 export type PromotionType = "upgrade" | "steal";
 
+export const kungFuGameLimitSeconds = 60 * 60;
+
+export function hasInitialBoardVariant(
+    initialBoard: InitialBoard,
+    variant: string,
+): boolean {
+    return initialBoard.split("+").includes(variant);
+}
+
+export function isKungFuInitialBoard(initialBoard: InitialBoard): boolean {
+    return hasInitialBoardVariant(initialBoard, "taijitu");
+}
+
 export class GameConfig {
     /** Number of boards */
     matchNum: number;
@@ -33,6 +46,10 @@ export class GameConfig {
     promotionType: PromotionType;
     /** Allowed pawn drop ranks in min-max format */
     pawnDropRanks: string;
+    /** Piece movement cooldown in seconds */
+    pieceCooldown: number;
+    /** Pocket drop cooldown in seconds */
+    pocketCooldown: number;
 
     constructor(
         matchNumber: number = 2,
@@ -46,6 +63,8 @@ export class GameConfig {
         dropAggression: DropAggression = "mate",
         promotionType: PromotionType = "upgrade",
         pawnDropRanks: string = "2-7",
+        pieceCooldown: number = 10,
+        pocketCooldown: number = 10,
     ) {
         this.matchNum = matchNumber;
         this.timeBase = timeBase;
@@ -58,6 +77,8 @@ export class GameConfig {
         this.dropAggression = dropAggression;
         this.promotionType = promotionType;
         this.pawnDropRanks = pawnDropRanks;
+        this.pieceCooldown = pieceCooldown;
+        this.pocketCooldown = pocketCooldown;
     }
 
     serialize(): Record<string, unknown> {
@@ -73,6 +94,8 @@ export class GameConfig {
             "drop-aggression": this.dropAggression,
             "promotion-type": this.promotionType,
             "pawn-drop-ranks": this.pawnDropRanks,
+            "piece-cooldown": this.pieceCooldown,
+            "pocket-cooldown": this.pocketCooldown,
         };
     }
 
@@ -111,6 +134,8 @@ export class GameConfig {
             typeof data["pawn-drop-ranks"] === "string"
                 ? data["pawn-drop-ranks"]
                 : "2-7",
+            (data["piece-cooldown"] ?? 10) as number,
+            (data["pocket-cooldown"] ?? 10) as number,
         );
     }
 }

@@ -4,6 +4,7 @@ import type {
     PromotionType,
     TimeType,
 } from "@shared/config";
+import { isKungFuInitialBoard } from "@shared/config";
 import { RoomStatus } from "@shared/room";
 import { gs } from "./session";
 import { createSettingsSelect, syncHoverPreviewSelect } from "./settings-ui";
@@ -45,6 +46,8 @@ export function initRoomSettingsUI(): void {
         "#setting-match-num",
         "#setting-time-base",
         "#setting-time-bonus",
+        "#setting-piece-cooldown",
+        "#setting-pocket-cooldown",
         "#setting-initial-board-fen",
         "#setting-pawn-drop-ranks",
     ])
@@ -58,6 +61,8 @@ export function initRoomSettingsUI(): void {
         "#setting-time-bonus",
         "#setting-time-type",
         "#setting-time-shared",
+        "#setting-piece-cooldown",
+        "#setting-pocket-cooldown",
         "#setting-initial-board-mode",
         "#setting-initial-board-fen",
         "#setting-drop-aggression",
@@ -76,11 +81,13 @@ export function initRoomSettingsUI(): void {
         stopRoomSettingsInputShortcut,
     );
     initialBoardModeSelect?.addEventListener("change", () => {
+        syncInitialBoardStartMode(initialBoardModeSelect);
         syncInitialBoardFenVisibility(
             initialBoardModeSelect,
             initialBoardFenInput,
         );
         syncRoomVariantButtons(initialBoardModeSelect);
+        syncClockSettingsLock(initialBoardModeSelect);
     });
 
     for (const variantButton of variantButtons) {
@@ -95,9 +102,14 @@ export function initRoomSettingsUI(): void {
             )
                 return;
 
-            initialBoardModeSelect.value = toggleInitialBoardVariant(
-                initialBoardModeSelect.value,
-                variant,
+            setInitialBoardUI(
+                initialBoardModeSelect,
+                initialBoardFenInput,
+                toggleInitialBoardVariant(
+                    initialBoardModeSelect.dataset.initialBoard ??
+                        initialBoardModeSelect.value,
+                    variant,
+                ),
             );
             syncInitialBoardFenVisibility(
                 initialBoardModeSelect,
@@ -105,6 +117,7 @@ export function initRoomSettingsUI(): void {
             );
             syncHoverPreviewSelect(initialBoardModeSelect);
             syncRoomVariantButtons(initialBoardModeSelect);
+            syncClockSettingsLock(initialBoardModeSelect);
             flushRoomSettingsSave();
         });
     }
@@ -122,20 +135,12 @@ export function initRoomSettingsUI(): void {
         [
             { value: "default", label: "Default" },
             { value: "960", label: "Chess960" },
-            { value: "koedem", label: "Koedem" },
-            { value: "accolade", label: "Accolade" },
-            { value: "960+koedem", label: "Chess960 + Koedem" },
-            { value: "960+accolade", label: "Chess960 + Accolade" },
-            { value: "koedem+accolade", label: "Koedem + Accolade" },
-            {
-                value: "960+koedem+accolade",
-                label: "Chess960 + Koedem + Accolade",
-            },
             { value: "custom", label: "Custom FEN" },
         ],
     );
     syncInitialBoardFenVisibility(initialBoardModeSelect, initialBoardFenInput);
     syncRoomVariantButtons(initialBoardModeSelect);
+    syncClockSettingsLock(initialBoardModeSelect);
 
     createSettingsSelect(
         document.querySelector("#setting-drop-aggression") as HTMLSelectElement,
@@ -210,6 +215,12 @@ export function updateRoomSettingsUI(): void {
     const timeBonusInput = document.querySelector(
         "#setting-time-bonus",
     ) as HTMLInputElement;
+    const pieceCooldownInput = document.querySelector(
+        "#setting-piece-cooldown",
+    ) as HTMLInputElement;
+    const pocketCooldownInput = document.querySelector(
+        "#setting-pocket-cooldown",
+    ) as HTMLInputElement;
     const timeTypeSelect = document.querySelector(
         "#setting-time-type",
     ) as HTMLSelectElement;
@@ -245,6 +256,8 @@ export function updateRoomSettingsUI(): void {
     matchInput.value = gs.room.game.config.matchNum.toString();
     timeInput.value = gs.room.game.config.timeBase.toString();
     timeBonusInput.value = gs.room.game.config.timeBonus.toString();
+    pieceCooldownInput.value = gs.room.game.config.pieceCooldown.toString();
+    pocketCooldownInput.value = gs.room.game.config.pocketCooldown.toString();
     timeTypeSelect.value = gs.room.game.config.timeType;
     timeSharedInput.checked = gs.room.game.config.timeShared;
     setInitialBoardUI(
@@ -264,11 +277,13 @@ export function updateRoomSettingsUI(): void {
     syncHoverPreviewSelect(pocketShareSelect);
 
     const editable = canEditRoomSettings();
+    const clockSettingsLocked = isKungFuInitialBoard(
+        gs.room.game.config.initialBoard,
+    );
     for (const element of [
         matchInput,
-        timeInput,
-        timeBonusInput,
-        timeSharedInput,
+        pieceCooldownInput,
+        pocketCooldownInput,
         initialBoardFenInput,
         pawnDropRanksInput,
         ...variantButtons,
@@ -287,6 +302,7 @@ export function updateRoomSettingsUI(): void {
             .nextElementSibling?.querySelector("button")
             ?.toggleAttribute("disabled", !editable);
     }
+    setClockSettingsDisabled(!editable || clockSettingsLocked);
     note.textContent =
         gs.room.status !== RoomStatus.LOBBY
             ? "Settings are locked while a game is playing."
@@ -325,6 +341,12 @@ function saveRoomSettings(): void {
     const timeBonusInput = document.querySelector(
         "#setting-time-bonus",
     ) as HTMLInputElement;
+    const pieceCooldownInput = document.querySelector(
+        "#setting-piece-cooldown",
+    ) as HTMLInputElement;
+    const pocketCooldownInput = document.querySelector(
+        "#setting-pocket-cooldown",
+    ) as HTMLInputElement;
     const timeTypeSelect = document.querySelector(
         "#setting-time-type",
     ) as HTMLSelectElement;
@@ -350,27 +372,48 @@ function saveRoomSettings(): void {
         "#setting-pocket-share",
     ) as HTMLSelectElement;
     const matchNum = readNumberSetting(matchInput);
+    const initialBoard = getInitialBoardSetting(
+        initialBoardModeSelect,
+        initialBoardFenInput,
+    );
+    const clockSettingsLocked = isKungFuInitialBoard(initialBoard);
     const timeBase = readNumberSetting(timeInput);
     const timeBonus = readNumberSetting(timeBonusInput);
-    if (matchNum === undefined || timeBase === undefined || timeBonus === undefined)
+    const pieceCooldown = readNumberSetting(pieceCooldownInput);
+    const pocketCooldown = readNumberSetting(pocketCooldownInput);
+    if (
+        matchNum === undefined ||
+        (!clockSettingsLocked && timeBase === undefined) ||
+        (!clockSettingsLocked && timeBonus === undefined) ||
+        pieceCooldown === undefined ||
+        pocketCooldown === undefined
+    )
         return;
 
-    gs.socket.emit("update-room-settings", {
+    const settings = {
         matchNum,
-        timeBase,
-        timeBonus,
-        timeType: timeTypeSelect.value as TimeType,
-        timeShared: timeSharedInput.checked,
+        pieceCooldown,
+        pocketCooldown,
         playerAssignment: gs.room.game.config.playerAssignment,
-        initialBoard: getInitialBoardSetting(
-            initialBoardModeSelect,
-            initialBoardFenInput,
-        ),
+        initialBoard,
         dropAggression: dropAggressionSelect.value as DropAggression,
         promotionType: promotionTypeSelect.value as PromotionType,
         pawnDropRanks: pawnDropRanksInput.value.trim(),
         pocketShare: pocketShareSelect.value as PocketShare,
-    });
+    };
+
+    gs.socket.emit(
+        "update-room-settings",
+        clockSettingsLocked
+            ? settings
+            : {
+                  ...settings,
+                  timeBase,
+                  timeBonus,
+                  timeType: timeTypeSelect.value as TimeType,
+                  timeShared: timeSharedInput.checked,
+              },
+    );
 }
 
 function readNumberSetting(input: HTMLInputElement): number | undefined {
@@ -385,14 +428,16 @@ function getInitialBoardSetting(
     fenInput: HTMLInputElement,
 ): string {
     if (modeSelect.value === "custom") return fenInput.value.trim();
-    return modeSelect.value;
+    return modeSelect.dataset.initialBoard ?? modeSelect.value;
 }
 
 function syncRoomVariantButtons(
     initialBoardModeSelect: HTMLSelectElement | null,
 ): void {
     const activeVariants = parseInitialBoardVariants(
-        initialBoardModeSelect?.value ?? "default",
+        initialBoardModeSelect?.dataset.initialBoard ??
+            initialBoardModeSelect?.value ??
+            "default",
     );
 
     for (const variantButton of document.querySelectorAll<HTMLButtonElement>(
@@ -412,7 +457,11 @@ function toggleInitialBoardVariant(
     const variants = parseInitialBoardVariants(initialBoard);
 
     if (variants.has(variant)) variants.delete(variant);
-    else variants.add(variant);
+    else {
+        variants.add(variant);
+        if (variant === "koedem") variants.delete("taijitu");
+        if (variant === "taijitu") variants.delete("koedem");
+    }
 
     return serializeInitialBoardVariants(variants);
 }
@@ -426,14 +475,15 @@ function parseInitialBoardVariants(initialBoard: string): Set<string> {
                 (current) =>
                     current === "960" ||
                     current === "koedem" ||
+                    current === "taijitu" ||
                     current === "accolade",
             ),
     );
 }
 
 function serializeInitialBoardVariants(variants: Set<string>): string {
-    const orderedVariants = ["960", "koedem", "accolade"].filter((variant) =>
-        variants.has(variant),
+    const orderedVariants = ["960", "koedem", "taijitu", "accolade"].filter(
+        (variant) => variants.has(variant),
     );
     return orderedVariants.length ? orderedVariants.join("+") : "default";
 }
@@ -447,17 +497,34 @@ function setInitialBoardUI(
     const variants = parseInitialBoardVariants(normalized);
     if (
         normalized === "default" ||
-        serializeInitialBoardVariants(variants) === normalized
+        (variants.size > 0 && serializeInitialBoardVariants(variants) === normalized)
     ) {
-        modeSelect.value = normalized;
+        modeSelect.dataset.initialBoard = normalized;
+        modeSelect.value = variants.has("960") ? "960" : "default";
         fenInput.value = "";
         syncInitialBoardFenVisibility(modeSelect, fenInput);
         return;
     }
 
+    modeSelect.dataset.initialBoard = initialBoard;
     modeSelect.value = "custom";
     fenInput.value = initialBoard;
     syncInitialBoardFenVisibility(modeSelect, fenInput);
+}
+
+function syncInitialBoardStartMode(modeSelect: HTMLSelectElement): void {
+    if (modeSelect.value === "custom") {
+        modeSelect.dataset.initialBoard = "custom";
+        return;
+    }
+
+    const variants = parseInitialBoardVariants(
+        modeSelect.dataset.initialBoard ?? "default",
+    );
+    if (modeSelect.value === "960") variants.add("960");
+    else variants.delete("960");
+
+    modeSelect.dataset.initialBoard = serializeInitialBoardVariants(variants);
 }
 
 function syncInitialBoardFenVisibility(
@@ -468,6 +535,41 @@ function syncInitialBoardFenVisibility(
         "hidden",
         modeSelect?.value !== "custom",
     );
+}
+
+function syncClockSettingsLock(
+    initialBoardModeSelect: HTMLSelectElement | null,
+): void {
+    const clockSettingsLocked = isKungFuInitialBoard(
+        initialBoardModeSelect?.dataset.initialBoard ??
+            initialBoardModeSelect?.value ??
+            "default",
+    );
+    setClockSettingsDisabled(!canEditRoomSettings() || clockSettingsLocked);
+}
+
+function setClockSettingsDisabled(disabled: boolean): void {
+    const timeInput = document.querySelector(
+        "#setting-time-base",
+    ) as HTMLInputElement | null;
+    const timeBonusInput = document.querySelector(
+        "#setting-time-bonus",
+    ) as HTMLInputElement | null;
+    const timeTypeSelect = document.querySelector(
+        "#setting-time-type",
+    ) as HTMLSelectElement | null;
+    const timeSharedInput = document.querySelector(
+        "#setting-time-shared",
+    ) as HTMLInputElement | null;
+
+    for (const element of [timeInput, timeBonusInput, timeSharedInput])
+        if (element) element.disabled = disabled;
+
+    if (!timeTypeSelect) return;
+    timeTypeSelect.disabled = disabled;
+    timeTypeSelect
+        .nextElementSibling?.querySelector("button")
+        ?.toggleAttribute("disabled", disabled);
 }
 
 function canEditRoomSettings(): boolean {

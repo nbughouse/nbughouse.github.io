@@ -1,7 +1,10 @@
 import { Chat } from "./chat";
 import type { Move, MoveResult, MoveRules, SerializedChess } from "./chess";
-import { Chess, Color, PieceType } from "./chess";
-import { GameConfig } from "./config";
+import { Chess, Color, invertColor, PieceType } from "./chess";
+import {
+    GameConfig,
+    hasInitialBoardVariant,
+} from "./config";
 import { Player, PlayerStatus } from "./player";
 
 const defaultTime = 180_000; // 3 minutes in milliseconds
@@ -11,6 +14,8 @@ const minTimeBase = 30;
 const maxTimeBase = 3600;
 const minTimeBonus = 0;
 const maxTimeBonus = 3600;
+const minCooldown = 0;
+const maxCooldown = 3600;
 
 export enum RoomStatus {
     LOBBY = "lobby",
@@ -58,6 +63,7 @@ export class Room {
     status: RoomStatus;
     game: Game;
     chat: Chat;
+    startedAt: number | undefined;
 
     constructor(code: string, hostID?: string) {
         this.code = code;
@@ -67,6 +73,7 @@ export class Room {
         this.status = RoomStatus.LOBBY;
         this.game = new Game();
         this.chat = new Chat();
+        this.startedAt = undefined;
         this.rebuildMatches();
     }
 
@@ -171,18 +178,18 @@ export class Room {
     tryStartRoom(currentTime: number = Date.now()): boolean {
         if (this.status !== RoomStatus.LOBBY) return false;
 
-        if (
-            !fillEmptyMatchPlayers(
-                this.game.matches,
-                this.connectedPlayers(),
-            )
-        )
+        const assignPlayers =
+            this.game.config.playerAssignment === "random"
+                ? randomizeMatchPlayers
+                : fillEmptyMatchPlayers;
+        if (!assignPlayers(this.game.matches, this.connectedPlayers()))
             return false;
 
         for (const match of this.game.matches)
             if (!match.whitePlayer || !match.blackPlayer) return false;
 
         this.status = RoomStatus.PLAYING;
+        this.startedAt = currentTime;
 
         for (const match of this.game.matches) {
             const startingTime = this.game.config.timeBase * 1000;
@@ -203,6 +210,7 @@ export class Room {
 
     endRoom(winner?: Team): void {
         this.status = RoomStatus.LOBBY;
+        this.startedAt = undefined;
 
         if (winner) {
             const playersOnTeam = [];
@@ -226,12 +234,15 @@ export class Room {
         const host = this.hostID ? this.players.get(this.hostID) : undefined;
         if (!host || host.status === PlayerStatus.DISCONNECTED)
             this.reassignHost();
+
+        this.resetLobbyMatches();
     }
 
     updateConfig(config: Partial<GameConfig>): boolean {
         let changed = false;
         let matchNumChanged = false;
         let timeBaseChanged = false;
+        let initialBoardChanged = false;
 
         if (typeof config.matchNum === "number") {
             const matchNum = clampInteger(
@@ -290,10 +301,11 @@ export class Room {
         if (
             typeof config.initialBoard === "string" &&
             config.initialBoard.trim().length > 0 &&
-            this.game.config.initialBoard !== config.initialBoard
+            this.game.config.initialBoard !== config.initialBoard.trim()
         ) {
             this.game.config.initialBoard = config.initialBoard.trim();
             changed = true;
+            initialBoardChanged = true;
         }
 
         if (
@@ -343,9 +355,34 @@ export class Room {
             changed = true;
         }
 
+        if (typeof config.pieceCooldown === "number") {
+            const pieceCooldown = clampInteger(
+                config.pieceCooldown,
+                minCooldown,
+                maxCooldown,
+            );
+            if (this.game.config.pieceCooldown !== pieceCooldown) {
+                this.game.config.pieceCooldown = pieceCooldown;
+                changed = true;
+            }
+        }
+
+        if (typeof config.pocketCooldown === "number") {
+            const pocketCooldown = clampInteger(
+                config.pocketCooldown,
+                minCooldown,
+                maxCooldown,
+            );
+            if (this.game.config.pocketCooldown !== pocketCooldown) {
+                this.game.config.pocketCooldown = pocketCooldown;
+                changed = true;
+            }
+        }
+
         if (!changed) return false;
 
         if (matchNumChanged) this.rebuildMatches();
+        else if (initialBoardChanged) this.resetLobbyMatches();
         else if (timeBaseChanged) this.updateLobbyMatchTimes();
 
         return true;
@@ -383,6 +420,17 @@ export class Room {
             match.lastMoveTime = Date.now();
         }
     }
+
+    private resetLobbyMatches(): void {
+        const startingTime = this.game.config.timeBase * 1000;
+        for (const match of this.game.matches) {
+            match.whiteTime = startingTime;
+            match.blackTime = startingTime;
+            match.lastMoveTime = Date.now();
+            match.queued = { moves: [], color: Color.WHITE };
+            resetMatchChess(match, this.game.config.initialBoard);
+        }
+    }
 }
 
 export class Game {
@@ -412,16 +460,47 @@ export class Game {
 
     getFinalChess(matchIndex: number): Chess {
         const chess = this.matches[matchIndex].chess.clone();
+        const rules = this.getMoveRules();
         for (const move of this.matches[matchIndex].queued.moves)
-            chess.doMove(move, true, this.getMoveRules());
+            chess.doMove(
+                move,
+                true,
+                rules,
+                0,
+                rules.turnless ? Infinity : 0,
+                rules.turnless ? Infinity : 0,
+            );
 
         return chess;
     }
 
-    doMove(matchIndex: number, move: Move): void {
+    doMove(
+        matchIndex: number,
+        move: Move,
+        currentTime: number = Date.now(),
+    ): void {
         const match = this.matches[matchIndex];
-        const result = match.chess.doMove(move, false, this.getMoveRules());
-        this.moveResultEffects(matchIndex, move, result);
+        const result = match.chess.doMove(
+            move,
+            false,
+            this.getMoveRules(),
+            currentTime,
+            this.getPieceCooldownMs(),
+            this.getPocketCooldownMs(),
+        );
+        this.moveResultEffects(matchIndex, move, result, currentTime);
+    }
+
+    canMove(
+        matchIndex: number,
+        move: Move,
+        currentTime: number = Date.now(),
+    ): boolean {
+        if (!hasInitialBoardVariant(this.config.initialBoard, "taijitu"))
+            return true;
+
+        const match = this.matches[matchIndex];
+        return match.chess.canMoveFrom(move.from, currentTime);
     }
 
     getMoveRules(): MoveRules {
@@ -429,20 +508,37 @@ export class Game {
             this.config.initialBoard,
             "koedem",
         );
+        const taijitu = hasInitialBoardVariant(
+            this.config.initialBoard,
+            "taijitu",
+        );
         return {
-            allowKingCapture: koedem,
+            allowKingCapture: koedem || taijitu,
             forcePocketKingDrop: koedem,
             accolade: hasInitialBoardVariant(
                 this.config.initialBoard,
                 "accolade",
             ),
+            dropAggression: this.config.dropAggression,
+            turnless: taijitu,
         };
+    }
+
+    checkCapturedKing(matchIndex: number, move: Move): Team | undefined {
+        if (!hasInitialBoardVariant(this.config.initialBoard, "taijitu"))
+            return undefined;
+        if (move.to.loc !== "board") return undefined;
+
+        const target = this.matches[matchIndex].chess.getPiece(move.to);
+        if (target?.type !== PieceType.KING) return undefined;
+        return this.matches[matchIndex].getTeam(invertColor(target.color));
     }
 
     private moveResultEffects(
         matchID: number,
         move: Move,
         result: MoveResult,
+        currentTime: number,
     ): void {
         if (result.captured) {
             for (let index = 0; index < this.matches.length; index++) {
@@ -470,8 +566,24 @@ export class Game {
                     move.from.type,
                     move.from.color,
                 );
+                this.matches[index].chess.setPocketCooldown(
+                    move.from.color,
+                    currentTime + this.getPocketCooldownMs(),
+                );
             }
         }
+    }
+
+    private getPieceCooldownMs(): number {
+        return hasInitialBoardVariant(this.config.initialBoard, "taijitu")
+            ? this.config.pieceCooldown * 1000
+            : 0;
+    }
+
+    private getPocketCooldownMs(): number {
+        return hasInitialBoardVariant(this.config.initialBoard, "taijitu")
+            ? this.config.pocketCooldown * 1000
+            : 0;
     }
 
     updateTime(currentTime: number = Date.now()): void {
@@ -607,13 +719,6 @@ function resetMatchChess(
     }
 
     match.chess.reset();
-}
-
-function hasInitialBoardVariant(
-    initialBoard: GameConfig["initialBoard"],
-    variant: string,
-): boolean {
-    return initialBoard.split("+").includes(variant);
 }
 
 /**

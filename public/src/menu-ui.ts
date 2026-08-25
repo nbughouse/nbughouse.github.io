@@ -646,7 +646,7 @@ function formatStatsTimestamp(timestamp: string): string {
 function formatRoundedCount(value: number | undefined): string {
     if (!Number.isFinite(value)) return "";
 
-    const count = Math.max(0, Math.floor(value));
+    const count = Math.max(0, Math.floor(value ?? 0));
     const rounded =
         count >= 1000 ? Math.floor(count / 100) * 100 : Math.floor(count / 10) * 10;
 

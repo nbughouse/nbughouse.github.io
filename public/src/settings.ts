@@ -1,5 +1,14 @@
 export type MovementMode = "drag" | "click" | "both";
-export type SoundName = "move" | "capture" | "check" | "castle";
+export type SoundName =
+    | "move"
+    | "capture"
+    | "check"
+    | "castle"
+    | "lowTime"
+    | "defeat"
+    | "draw"
+    | "victory"
+    | "newChallenge";
 export type SoundTheme =
     | "sfx"
     | "standard"
@@ -94,32 +103,86 @@ export const soundThemes: readonly SoundThemeOption[] = [
     {
         id: "sfx",
         name: "SFX",
-        sounds: { move: "Move.mp3", capture: "Capture.mp3", check: "Check.mp3" },
+        sounds: {
+            move: "Move.mp3",
+            capture: "Capture.mp3",
+            check: "Check.mp3",
+            lowTime: "LowTime.mp3",
+            defeat: "Defeat.mp3",
+            draw: "Draw.mp3",
+            victory: "Victory.mp3",
+            newChallenge: "NewChallenge.mp3",
+        },
     },
     {
         id: "standard",
         name: "Standard",
-        sounds: { move: "Move.mp3", capture: "Capture.mp3" },
+        sounds: {
+            move: "Move.mp3",
+            capture: "Capture.mp3",
+            check: "Check.mp3",
+            lowTime: "LowTime.mp3",
+            defeat: "Defeat.mp3",
+            draw: "Draw.mp3",
+            victory: "Victory.mp3",
+            newChallenge: "NewChallenge.mp3",
+        },
     },
     {
         id: "robot",
         name: "Robot",
-        sounds: { move: "Move.mp3", capture: "Capture.mp3", check: "Check.mp3" },
+        sounds: {
+            move: "Move.mp3",
+            capture: "Capture.mp3",
+            check: "Check.mp3",
+            lowTime: "LowTime.mp3",
+            defeat: "Defeat.mp3",
+            draw: "Draw.mp3",
+            victory: "Victory.mp3",
+            newChallenge: "NewChallenge.mp3",
+        },
     },
     {
         id: "futuristic",
         name: "Futuristic",
-        sounds: { move: "Move.mp3", capture: "Capture.mp3", check: "Check.mp3" },
+        sounds: {
+            move: "Move.mp3",
+            capture: "Capture.mp3",
+            check: "Check.mp3",
+            lowTime: "LowTime.mp3",
+            defeat: "Defeat.mp3",
+            draw: "Draw.mp3",
+            victory: "Victory.mp3",
+            newChallenge: "NewChallenge.mp3",
+        },
     },
     {
         id: "woodland",
         name: "Woodland",
-        sounds: { move: "Move.mp3", capture: "Capture.mp3", check: "Check.mp3" },
+        sounds: {
+            move: "Move.mp3",
+            capture: "Capture.mp3",
+            check: "Check.mp3",
+            lowTime: "LowTime.mp3",
+            defeat: "Defeat.mp3",
+            draw: "Draw.mp3",
+            victory: "Victory.mp3",
+            newChallenge: "NewChallenge.mp3",
+        },
     },
     {
         id: "nes",
         name: "NES",
-        sounds: { move: "Move.mp3", capture: "Capture.mp3", check: "Check.mp3" },
+        sounds: {
+            move: "Move.mp3",
+            capture: "Capture.mp3",
+            check: "Check.mp3",
+            lowTime: "LowTime.mp3",
+            defeat: "Defeat.mp3",
+            draw: "Draw.mp3",
+            victory: "Victory.mp3",
+            newChallenge: "NewChallenge.mp3",
+        },
     },
     {
         id: "lisp",
@@ -129,12 +192,26 @@ export const soundThemes: readonly SoundThemeOption[] = [
             capture: "Capture.mp3",
             check: "Check.mp3",
             castle: "Castles.mp3",
+            lowTime: "LowTime.mp3",
+            defeat: "Defeat.mp3",
+            draw: "Draw.mp3",
+            victory: "Victory.mp3",
+            newChallenge: "NewChallenge.mp3",
         },
     },
     {
         id: "piano",
         name: "Piano",
-        sounds: { move: "Move.mp3", capture: "Capture.mp3", check: "Check.mp3" },
+        sounds: {
+            move: "Move.mp3",
+            capture: "Capture.mp3",
+            check: "Check.mp3",
+            lowTime: "LowTime.mp3",
+            defeat: "Defeat.mp3",
+            draw: "Draw.mp3",
+            victory: "Victory.mp3",
+            newChallenge: "NewChallenge.mp3",
+        },
     },
 ];
 

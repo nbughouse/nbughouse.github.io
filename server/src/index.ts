@@ -4,7 +4,11 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import { Server, Socket } from "socket.io";
-import { config } from "@shared/config";
+import {
+    config,
+    isKungFuInitialBoard,
+    kungFuGameLimitSeconds,
+} from "@shared/config";
 import { getPlayerDisplayName, Player, sanitizePlayerName } from "@shared/player";
 import type { Room } from "@shared/room";
 import { RoomStatus, Team } from "@shared/room";
@@ -155,6 +159,27 @@ setInterval(() => {
     const currentTime = Date.now();
     for (const [code, room] of rooms) {
         if (room.status === RoomStatus.PLAYING) {
+            if (isKungFuInitialBoard(room.game.config.initialBoard)) {
+                if (
+                    room.startedAt !== undefined &&
+                    currentTime - room.startedAt >=
+                        kungFuGameLimitSeconds * 1000
+                ) {
+                    const reason = "Kung Fu time limit reached.";
+                    recordCompletedGame(room);
+                    room.endRoom();
+                    io.to(code).emit(
+                        "ended-room",
+                        undefined,
+                        reason,
+                        currentTime,
+                    );
+                    io.to(code).emit("room-host-updated", room.hostID);
+                    if (room.players.size === 0) rooms.delete(code);
+                }
+                continue;
+            }
+
             room.game.updateTime(currentTime);
             const timeout = room.game.checkTimeout();
             if (timeout) {

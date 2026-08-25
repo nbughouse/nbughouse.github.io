@@ -368,6 +368,11 @@
    line-height: 1.45;
 }
 
+.help-block a {
+   color: var(--text);
+   font-weight: var(--font-weight-bold);
+}
+
 .help-block ol,
 .help-block ul {
    display: grid;
