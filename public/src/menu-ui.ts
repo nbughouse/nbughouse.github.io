@@ -6,7 +6,6 @@ import { setStoredProfileValue, sn } from "./session";
 import { sanitizePlayerName } from "@shared/player";
 import { getBasePath } from "./app-paths";
 import { applyAllChessSettings, applyPieceAnimationSpeed } from "./chess-ui";
-import { initMenuBackground } from "./menu-background";
 import { fetchSiteStats, type SiteStats } from "./stats-api";
 import {
     boardThemes,
@@ -42,7 +41,6 @@ interface BughouseHistoryState {
 export function initMenuControls(): void {
     initMenuHistory();
     preloadSettingsAssets();
-    initMenuBackground();
     applyAllChessSettings();
 
     const createGameButton = document.querySelector(
