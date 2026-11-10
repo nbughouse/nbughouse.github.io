@@ -6,6 +6,7 @@ export interface SerializedChess {
     whitePocketCooldown?: number;
     blackPocketCooldown?: number;
     turn: Color;
+    duckPending?: boolean;
     whiteCastleShort: boolean;
     whiteCastleLong: boolean;
     blackCastleShort: boolean;
@@ -15,9 +16,12 @@ export interface SerializedChess {
     blackCastleShortRookCol?: number;
     blackCastleLongRookCol?: number;
     enPassantTarget: BoardPosition | undefined;
+    repetitionCounts?: [string, number][];
+    lastRepetitionPosition?: string;
 }
 
 export interface MoveRules {
+    duck?: boolean;
     allowKingCapture?: boolean;
     forcePocketKingDrop?: boolean;
     accolade?: boolean;
@@ -34,6 +38,8 @@ export class Chess {
     whitePocketCooldown: number = 0;
     blackPocketCooldown: number = 0;
     turn: Color = Color.WHITE;
+    /** The active player must place the duck before passing the turn. */
+    duckPending = false;
     whiteCastleShort: boolean = true;
     whiteCastleLong: boolean = true;
     blackCastleShort: boolean = true;
@@ -43,6 +49,8 @@ export class Chess {
     blackCastleShortRookCol: number = 7;
     blackCastleLongRookCol: number = 0;
     enPassantTarget: BoardPosition | undefined = undefined;
+    private repetitionCounts = new Map<string, number>();
+    private lastRepetitionPosition: string | undefined;
 
     constructor() {
         this.reset();
@@ -57,6 +65,7 @@ export class Chess {
         chess.whitePocketCooldown = this.whitePocketCooldown;
         chess.blackPocketCooldown = this.blackPocketCooldown;
         chess.turn = this.turn;
+        chess.duckPending = this.duckPending;
         chess.whiteCastleShort = this.whiteCastleShort;
         chess.whiteCastleLong = this.whiteCastleLong;
         chess.blackCastleShort = this.blackCastleShort;
@@ -66,6 +75,8 @@ export class Chess {
         chess.blackCastleShortRookCol = this.blackCastleShortRookCol;
         chess.blackCastleLongRookCol = this.blackCastleLongRookCol;
         chess.enPassantTarget = this.enPassantTarget;
+        chess.repetitionCounts = new Map(this.repetitionCounts);
+        chess.lastRepetitionPosition = this.lastRepetitionPosition;
         return chess;
     }
 
@@ -84,6 +95,7 @@ export class Chess {
             whitePocketCooldown: this.whitePocketCooldown,
             blackPocketCooldown: this.blackPocketCooldown,
             turn: this.turn,
+            duckPending: this.duckPending,
             whiteCastleShort: this.whiteCastleShort,
             whiteCastleLong: this.whiteCastleLong,
             blackCastleShort: this.blackCastleShort,
@@ -93,6 +105,8 @@ export class Chess {
             blackCastleShortRookCol: this.blackCastleShortRookCol,
             blackCastleLongRookCol: this.blackCastleLongRookCol,
             enPassantTarget: this.enPassantTarget,
+            repetitionCounts: [...this.repetitionCounts],
+            lastRepetitionPosition: this.lastRepetitionPosition,
         };
     }
 
@@ -111,6 +125,7 @@ export class Chess {
         chess.whitePocketCooldown = data.whitePocketCooldown ?? 0;
         chess.blackPocketCooldown = data.blackPocketCooldown ?? 0;
         chess.turn = data.turn;
+        chess.duckPending = data.duckPending ?? false;
         chess.whiteCastleShort = data.whiteCastleShort;
         chess.whiteCastleLong = data.whiteCastleLong;
         chess.blackCastleShort = data.blackCastleShort;
@@ -120,16 +135,21 @@ export class Chess {
         chess.blackCastleShortRookCol = data.blackCastleShortRookCol ?? 7;
         chess.blackCastleLongRookCol = data.blackCastleLongRookCol ?? 0;
         chess.enPassantTarget = data.enPassantTarget;
+        chess.repetitionCounts = new Map(data.repetitionCounts ?? []);
+        chess.lastRepetitionPosition = data.lastRepetitionPosition;
         return chess;
     }
 
     reset(backRank: PieceType[] = defaultBackRank()): void {
+        this.repetitionCounts.clear();
+        this.lastRepetitionPosition = undefined;
         this.whitePocket = new Map();
         this.blackPocket = new Map();
         this.boardCooldowns = createCooldownBoard();
         this.whitePocketCooldown = 0;
         this.blackPocketCooldown = 0;
         this.turn = Color.WHITE;
+        this.duckPending = false;
         this.whiteCastleShort = true;
         this.whiteCastleLong = true;
         this.blackCastleShort = true;
@@ -163,6 +183,50 @@ export class Chess {
         this.reset(randomBackRank());
     }
 
+    /** Position identity excludes clocks and cooldown timestamps. */
+    getRepetitionPosition(rules: MoveRules = {}): string {
+        const pocket = (color: Color) => [...this.getPocket(color)]
+            .filter(([, count]) => count > 0)
+            .sort(([a], [b]) => a.localeCompare(b));
+        // An en passant marker matters only when a legal capture is available.
+        const ep = this.enPassantTarget;
+        const legalEnPassant = ep && [ep.col - 1, ep.col + 1].some(col => {
+            const colors = rules.turnless ? [Color.WHITE, Color.BLACK] : [this.turn];
+            return colors.some(color => {
+                const row = ep.row + (color === Color.WHITE ? 1 : -1);
+                const from = createPosition(row, col);
+                return row >= 0 && row < 8 && col >= 0 && col < 8 &&
+                    this.board[row][col]?.type === PieceType.PAWN &&
+                    this.board[row][col]?.color === color &&
+                    this.isLegal({ from, to: ep }, false, rules);
+            });
+        });
+        return JSON.stringify([
+            this.board.map(row => row.map(piece => piece
+                ? [piece.type, piece.color, piece.combinedWith ?? null] : null)),
+            pocket(Color.WHITE), pocket(Color.BLACK), this.turn, this.duckPending,
+            this.whiteCastleShort ? this.whiteCastleShortRookCol : null,
+            this.whiteCastleLong ? this.whiteCastleLongRookCol : null,
+            this.blackCastleShort ? this.blackCastleShortRookCol : null,
+            this.blackCastleLong ? this.blackCastleLongRookCol : null,
+            legalEnPassant ? [ep.row, ep.col] : null,
+        ]);
+    }
+
+    /** Record changed positions only; unrelated boards do not add occurrences. */
+    recordRepetition(rules: MoveRules = {}): void {
+        if (rules.duck && this.duckPending) return;
+        const position = this.getRepetitionPosition(rules);
+        if (position === this.lastRepetitionPosition) return;
+        this.repetitionCounts.set(position, (this.repetitionCounts.get(position) ?? 0) + 1);
+        this.lastRepetitionPosition = position;
+    }
+
+    isThreefoldRepetition(rules: MoveRules = {}): boolean {
+        if (rules.duck && this.duckPending) return false;
+        return (this.repetitionCounts.get(this.getRepetitionPosition(rules)) ?? 0) >= 3;
+    }
+
     getPocket(color: Color): Map<PieceType, number> {
         return color ? this.whitePocket : this.blackPocket;
     }
@@ -171,6 +235,10 @@ export class Chess {
         if (pos.loc === "board") {
             return this.board[pos.row][pos.col];
         } else {
+            if (pos.type === PieceType.DUCK)
+                return this.duckPending && pos.color === this.turn
+                    ? { type: PieceType.DUCK, color: this.turn }
+                    : undefined;
             const pocket = this.getPocket(pos.color);
             const count = pocket.get(pos.type) || 0;
             return count > 0 ? { type: pos.type, color: pos.color } : undefined;
@@ -333,7 +401,7 @@ export class Chess {
         );
     }
 
-    private canCastle(color: Color, side: CastleMove): boolean {
+    private canCastle(color: Color, side: CastleMove, ignoreCheck = false): boolean {
         if (!this.hasCastleRight(color, side)) return false;
 
         // Check if king and rook are in place
@@ -352,7 +420,7 @@ export class Chess {
         if (!rook || rook.type !== PieceType.ROOK || rook.color !== color)
             return false;
 
-        if (this.isInCheck(color)) return false;
+        if (!ignoreCheck && this.isInCheck(color)) return false;
 
         const enemyColor = invertColor(color);
         const kingDestinationCol = side === CastleMove.SHORT ? 6 : 2;
@@ -371,7 +439,7 @@ export class Chess {
             )
                 return false;
 
-            if (this.isSquareAttacked({ loc: "board", row, col }, enemyColor))
+            if (!ignoreCheck && this.isSquareAttacked({ loc: "board", row, col }, enemyColor))
                 return false;
         }
 
@@ -419,6 +487,16 @@ export class Chess {
         const homeRank = piece.color ? 7 : 0;
         if (from.row !== homeRank) return;
 
+        // In Chess960 a rook may occupy c/g on the opposite castling side.
+        // A king-to-rook move identifies that rook before destination notation.
+        const target = this.board[to.row][to.col];
+        if (target?.type === PieceType.ROOK && target.color === piece.color) {
+            if (to.col === this.getCastleRookCol(piece.color, CastleMove.SHORT))
+                return CastleMove.SHORT;
+            if (to.col === this.getCastleRookCol(piece.color, CastleMove.LONG))
+                return CastleMove.LONG;
+        }
+
         if (to.col === 6 && from.col !== to.col) return CastleMove.SHORT;
         if (to.col === 2 && from.col !== to.col) return CastleMove.LONG;
 
@@ -439,18 +517,24 @@ export class Chess {
         piece: Piece,
         from: BoardPosition,
         to: BoardPosition,
+        ignoreCheck = false,
     ): CastleMove | undefined {
         const side = this.getCastleSideForMove(piece, from, to);
-        return side && this.canCastle(piece.color, side) ? side : undefined;
+        return side && this.canCastle(piece.color, side, ignoreCheck) ? side : undefined;
     }
 
     private isEnPassantMove(from: BoardPosition, to: BoardPosition): boolean {
         if (!this.enPassantTarget) return false;
         const piece = this.board[from.row][from.col];
         if (!piece || piece.type !== PieceType.PAWN) return false;
+        const captured = this.board[from.row][to.col];
         return (
             to.row === this.enPassantTarget.row &&
-            to.col === this.enPassantTarget.col
+            to.col === this.enPassantTarget.col &&
+            to.row - from.row === (piece.color === Color.WHITE ? -1 : 1) &&
+            Math.abs(to.col - from.col) === 1 &&
+            !this.board[to.row][to.col] &&
+            captured?.type === PieceType.PAWN && captured.color !== piece.color
         );
     }
 
@@ -459,6 +543,7 @@ export class Chess {
         from: BoardPosition,
         to: BoardPosition,
         premove: boolean,
+        ignoreCheck = false,
     ): boolean {
         if (isKnightMove(from, to)) return pieceHasKnightMovement(piece);
 
@@ -545,7 +630,7 @@ export class Chess {
                     return true;
 
                 const side = this.getCastleSideForMove(piece, from, to);
-                if (side) return premove || this.canCastle(piece.color, side);
+                if (side) return premove || this.canCastle(piece.color, side, ignoreCheck);
 
                 return false;
             }
@@ -580,7 +665,7 @@ export class Chess {
 
         if (
             piece &&
-            this.getLegalCastleSideForMove(piece, move.from, move.to)
+            this.getLegalCastleSideForMove(piece, move.from, move.to, rules.duck)
         )
             return MoveType.CASTLE;
 
@@ -613,7 +698,7 @@ export class Chess {
             return this.isValidMovementPattern(piece, from, to, true);
 
         const targetPiece = this.board[to.row][to.col];
-        const castleSide = this.getLegalCastleSideForMove(piece, from, to);
+        const castleSide = this.getLegalCastleSideForMove(piece, from, to, rules.duck);
         if (
             targetPiece?.type === PieceType.KING &&
             !rules.allowKingCapture
@@ -635,7 +720,7 @@ export class Chess {
             return false;
 
         // Check if movement pattern is valid
-        if (!this.isValidMovementPattern(piece, from, to, false))
+        if (!this.isValidMovementPattern(piece, from, to, false, rules.duck))
             return false;
 
         if (castleSide) return true;
@@ -700,6 +785,8 @@ export class Chess {
             !(rules.accolade && canCombinePieces(droppedPiece, targetPiece))
         )
             return false;
+        // Duck games have no check restrictions, including pocket drops.
+        if (rules.duck) return true;
         this.board[to.row][to.col] = targetPiece
             ? combinePieces(droppedPiece, targetPiece)
             : droppedPiece;
@@ -724,6 +811,24 @@ export class Chess {
     }
 
     isLegal(move: Move, premove = false, rules: MoveRules = {}): boolean {
+        if (!move || !isValidPosition(move.from) || !isValidPosition(move.to))
+            return false;
+        // A virtual duck source allows the initial placement and later relocation
+        // to use the existing move transport without adding a duck to any pocket.
+        if (move.from.loc === "pocket" && move.from.type === PieceType.DUCK)
+            return !!rules.duck && !premove && this.duckPending &&
+                move.from.color === this.turn && move.to.loc === "board" &&
+                !this.getPiece(move.to) && move.promotion === undefined;
+        if (rules.duck && (premove || this.duckPending)) return false;
+        if (
+            this.getPiece(move.from)?.type === PieceType.DUCK ||
+            this.getPiece(move.to)?.type === PieceType.DUCK
+        ) return false;
+        if (
+            move.promotion !== undefined && ![
+                PieceType.QUEEN, PieceType.ROOK, PieceType.BISHOP, PieceType.KNIGHT,
+            ].includes(move.promotion)
+        ) return false;
         if (move.to.loc === "pocket") return true;
         if (
             !premove &&
@@ -755,6 +860,17 @@ export class Chess {
         const from = move.from;
         const to = move.to;
 
+        if (rules.duck && from.loc === "pocket" && from.type === PieceType.DUCK) {
+            if (!this.isLegal(move, false, rules)) return {};
+            for (const row of this.board)
+                for (let col = 0; col < row.length; col++)
+                    if (row[col]?.type === PieceType.DUCK) row[col] = undefined;
+            this.board[to.row][to.col] = { type: PieceType.DUCK, color: Color.WHITE };
+            this.duckPending = false;
+            this.turn = invertColor(this.turn);
+            return {};
+        }
+
         if (from.loc === "pocket") {
             const droppedPiece: Piece = {
                 type: from.type,
@@ -771,7 +887,8 @@ export class Chess {
             this.setBoardCooldown(to, currentTime + pieceCooldown);
             this.setPocketCooldown(from.color, currentTime + pocketCooldown);
 
-            if (!premove && !rules.turnless) this.turn = invertColor(this.turn);
+            if (rules.duck) this.duckPending = true;
+            else if (!premove && !rules.turnless) this.turn = invertColor(this.turn);
             return {};
         }
 
@@ -781,22 +898,20 @@ export class Chess {
         const targetPiece = this.board[to.row][to.col];
         const castleSide = premove
             ? this.getCastleSideForMove(piece, from, to)
-            : this.getLegalCastleSideForMove(piece, from, to);
+            : this.getLegalCastleSideForMove(piece, from, to, rules.duck);
         const combining =
             rules.accolade && targetPiece
                 ? canCombinePieces(piece, targetPiece)
                 : false;
         let captured =
-            castleSide
+            castleSide || combining
                 ? undefined
                 : targetPiece?.type === PieceType.PROMOTED_QUEEN
                 ? {
                       type: PieceType.PAWN,
                       color: targetPiece.color,
                   }
-                : combining
-                  ? undefined
-                  : targetPiece;
+                : targetPiece;
 
         // Handle en passant capture
         if (piece.type === PieceType.PAWN && this.isEnPassantMove(from, to)) {
@@ -945,12 +1060,36 @@ export class Chess {
             }
         }
 
-        if (!premove && !rules.turnless) this.turn = invertColor(this.turn);
+        if (rules.duck) this.duckPending = captured?.type !== PieceType.KING;
+        else if (!premove && !rules.turnless) this.turn = invertColor(this.turn);
         return { captured, promoted };
     }
 
     isCheckmate(rules: MoveRules = {}): boolean {
+        if (rules.duck) return false;
         return this.isCheckmateFor(this.turn, rules);
+    }
+
+    /** A player with no chess move wins by fowling in Duck Chess. */
+    isFowled(rules: MoveRules): boolean {
+        if (!rules.duck || this.duckPending) return false;
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const from = createPosition(row, col);
+                const piece = this.getPiece(from);
+                if (!piece || piece.type === PieceType.DUCK || piece.color !== this.turn) continue;
+                for (let r = 0; r < 8; r++)
+                    for (let c = 0; c < 8; c++)
+                        if (this.isLegal({ from, to: createPosition(r, c) }, false, rules)) return false;
+            }
+        }
+        for (const [type, count] of this.getPocket(this.turn)) {
+            if (count <= 0) continue;
+            for (let row = 0; row < 8; row++)
+                for (let col = 0; col < 8; col++)
+                    if (this.isLegal({ from: createPosition(this.turn, type), to: createPosition(row, col) }, false, rules)) return false;
+        }
+        return true;
     }
 
     private isCheckmateFor(color: Color, rules: MoveRules = {}): boolean {
@@ -1034,6 +1173,15 @@ export interface PocketPosition {
 
 export type Position = BoardPosition | PocketPosition;
 
+export function isValidPosition(pos: Position): boolean {
+    if (!pos || typeof pos !== "object") return false;
+    if (pos.loc === "board")
+        return Number.isInteger(pos.row) && pos.row >= 0 && pos.row < 8 &&
+            Number.isInteger(pos.col) && pos.col >= 0 && pos.col < 8;
+    return pos.loc === "pocket" && (pos.color === Color.WHITE || pos.color === Color.BLACK) &&
+        Object.values(PieceType).includes(pos.type);
+}
+
 export function createPosition(row: number, col: number): BoardPosition;
 export function createPosition(color: Color, type: PieceType): PocketPosition;
 export function createPosition(
@@ -1057,6 +1205,7 @@ export function positionsEqual(a: Position, b: Position): boolean {
 }
 
 export enum PieceType {
+    DUCK = "D",
     KING = "K",
     QUEEN = "Q",
     ROOK = "R",

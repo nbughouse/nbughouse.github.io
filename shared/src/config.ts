@@ -23,6 +23,14 @@ export function isKungFuInitialBoard(initialBoard: InitialBoard): boolean {
     return hasInitialBoardVariant(initialBoard, "taijitu");
 }
 
+/** Duck's alternating turns and king-capture win cannot combine with these modes. */
+export function normalizeInitialBoard(initialBoard: InitialBoard): InitialBoard {
+    if (!hasInitialBoardVariant(initialBoard, "duck")) return initialBoard;
+    return initialBoard.split("+").filter((variant) =>
+        variant !== "koedem" && variant !== "taijitu",
+    ).join("+");
+}
+
 export class GameConfig {
     /** Number of boards */
     matchNum: number;
@@ -71,7 +79,7 @@ export class GameConfig {
         this.timeBonus = timeBonus;
         this.timeType = timeType;
         this.timeShared = timeShared;
-        this.initialBoard = initialBoard;
+        this.initialBoard = normalizeInitialBoard(initialBoard);
         this.playerAssignment = playerAssignment;
         this.pocketShare = pocketShare;
         this.dropAggression = dropAggression;

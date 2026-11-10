@@ -461,6 +461,11 @@ function toggleInitialBoardVariant(
         variants.add(variant);
         if (variant === "koedem") variants.delete("taijitu");
         if (variant === "taijitu") variants.delete("koedem");
+        if (variant === "duck") {
+            variants.delete("koedem");
+            variants.delete("taijitu");
+        }
+        if (variant === "koedem" || variant === "taijitu") variants.delete("duck");
     }
 
     return serializeInitialBoardVariants(variants);
@@ -476,13 +481,14 @@ function parseInitialBoardVariants(initialBoard: string): Set<string> {
                     current === "960" ||
                     current === "koedem" ||
                     current === "taijitu" ||
-                    current === "accolade",
+                    current === "accolade" ||
+                    current === "duck",
             ),
     );
 }
 
 function serializeInitialBoardVariants(variants: Set<string>): string {
-    const orderedVariants = ["960", "koedem", "taijitu", "accolade"].filter(
+    const orderedVariants = ["960", "koedem", "taijitu", "accolade", "duck"].filter(
         (variant) => variants.has(variant),
     );
     return orderedVariants.length ? orderedVariants.join("+") : "default";

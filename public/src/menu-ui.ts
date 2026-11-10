@@ -1,5 +1,5 @@
 import { refreshDualBoardLayout } from "./game-ui";
-import { resetSidebarUI, stopPingUpdates } from "./sidebar-ui";
+import { stopPingUpdates } from "./sidebar-ui";
 import { stopTimeUpdates } from "./match-ui";
 import { roomExists } from "./room-api";
 import { setStoredProfileValue, sn } from "./session";
@@ -7,6 +7,7 @@ import { sanitizePlayerName } from "@shared/player";
 import { getBasePath } from "./app-paths";
 import { applyAllChessSettings, applyPieceAnimationSpeed } from "./chess-ui";
 import { fetchSiteStats, type SiteStats } from "./stats-api";
+import { initMenuBackground } from "./menu-background";
 import {
     boardThemes,
     pieceThemes,
@@ -41,6 +42,7 @@ interface BughouseHistoryState {
 export function initMenuControls(): void {
     initMenuHistory();
     preloadSettingsAssets();
+    initMenuBackground();
     applyAllChessSettings();
 
     const createGameButton = document.querySelector(
@@ -700,6 +702,7 @@ function showMainMenuView(updateHistory = true): void {
     settingsSection?.classList.add("hidden");
     mainSection?.classList.remove("hidden");
     codeInput.value = "";
+    syncMenuNameInputs("");
     setMenuView("main", updateHistory);
     clearErrors();
 }
@@ -935,15 +938,13 @@ export function showScreen(screenId: string): void {
 }
 
 export function showMenuScreen(updateHistory = true): void {
-    resetSidebarUI();
     showScreen("menu");
     showMainMenuView(updateHistory);
     clearErrors();
-    const gameArea = document.querySelector("#game-area");
-    if (gameArea) gameArea.innerHTML = "";
-
     stopPingUpdates();
     stopTimeUpdates();
+    sn.room = undefined;
+    initMenuBackground(true);
 }
 
 export function showError(elementId: string, message: string): void {

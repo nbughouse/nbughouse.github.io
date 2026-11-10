@@ -90,37 +90,13 @@ function initPingIndicator(): void {
 }
 
 function updatePingDisplay(ping: number): void {
+    if (!document.querySelector("#menu")?.classList.contains("hidden")) return;
     const pingIndicator = document.querySelector("#ping-indicator") as HTMLElement;
     const pingLabel = `Ping: ${Math.round(ping)} ms`;
     pingIndicator.title = pingLabel;
     pingIndicator.setAttribute("aria-label", pingLabel);
-
-    const ranges = [
-        { max: 50, bars: 4, color: "var(--green)" },
-        { max: 100, bars: 3, color: "var(--green-yellow)" },
-        { max: 150, bars: 2, color: "var(--yellow)" },
-        { max: 250, bars: 1, color: "var(--yellow-red)" },
-        { max: Infinity, bars: 1, color: "var(--red)" },
-    ];
-
-    const foundRange = ranges.find((r) => ping < r.max);
-    if (!foundRange) return;
-
-    const { bars: activeBars, color } = foundRange;
-
-    // Update bar colors
-    const bars = document.querySelectorAll(".ping-bar");
-    for (const [index, bar] of bars.entries()) {
-        const barElement = bar as HTMLElement;
-        // We check from the bottom up (index < activeBars)
-        if (index < activeBars) {
-            barElement.style.backgroundColor = color;
-            barElement.style.opacity = "1";
-        } else {
-            barElement.style.backgroundColor = "var(--background)";
-            barElement.style.opacity = "0.3";
-        }
-    }
+    const color = ping < 100 ? "var(--green)" : ping < 150 ? "var(--yellow)" : "var(--red)";
+    pingIndicator.style.setProperty("--ping-color", color);
 }
 
 function sendPing(): void {
@@ -138,6 +114,12 @@ export function startPingUpdates(): void {
 
 export function stopPingUpdates(): void {
     clearInterval(pingIntervalID);
+    const pingIndicator = document.querySelector<HTMLElement>("#ping-indicator");
+    if (pingIndicator) {
+        pingIndicator.style.removeProperty("--ping-color");
+        pingIndicator.title = "Connection";
+        pingIndicator.setAttribute("aria-label", "Connection");
+    }
 }
 
 export function showSidebarRoomElements(): void {

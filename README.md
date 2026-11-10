@@ -4,6 +4,50 @@ Browser-based multiplayer bughouse chess with support for multiple simultaneous
 boards. The frontend is a Vite TypeScript app, the backend is an Express and
 Socket.IO server, and shared game state lives in `shared/src`.
 
+## Duck Variant
+
+Enable Duck in the room's Variants panel. Make a chess move (or pocket drop),
+then click an empty square to place the duck. After the first turn, the duck
+must move to a different square. It blocks both sides and cannot be captured.
+Your clock runs until you place it. Capture the opposing king to win; check
+restrictions do not apply, including during castling. A player with no legal
+chess move or pocket drop wins by fowling.
+
+Duck combines with Chess960 and Accolade, and is mutually exclusive with
+Koedem and Kung Fu. Premoves are disabled in Duck games.
+
+The room draws automatically when the same position occurs three times on any
+one board. Counts are separate per board and include the starting position,
+pockets, side to move, castling rights, and legally available en passant.
+Duck turns count after duck placement. Clocks and cooldown timestamps do not
+change position identity.
+
+## Tests
+
+Variant tests live in `tests/variants/`, with one file per selectable variant or
+combination. Reusable rule checks live in `tests/suites/`, and shared fixtures
+live in `tests/helpers.ts`. Install dependencies, including the development
+dependencies used by the test runner and Node type definitions, before running
+the rules and repetition suite without a server:
+
+```bash
+pnpm install
+pnpm test
+pnpm run test:typecheck
+```
+
+Run only the variant rules tests (standard, Random, Chess960, Accolade, Koedem,
+Kung Fu, Duck, and their selectable combinations):
+
+```bash
+pnpm run test:variants
+```
+
+The suite includes all 960 castling layouts, seeded randomized room starts,
+Accolade combinations and drops, Koedem king transfer and accumulation, and
+Kung Fu cooldown boundaries and serialization. None of these commands starts
+a server.
+
 ## Live Setup
 
 The complete app is hosted at `https://nbug.app`. The VM container serves the
@@ -194,7 +238,7 @@ Sounds and chess assets are credited to [Lichess](https://lichess.org).
 4. The host starts the room once players are set.
 5. Captures are added to teammate pockets.
 6. Pocket pieces can be dropped on eligible boards.
-7. A room ends on checkmate, resignation, or timeout.
+7. A room ends on checkmate, a variant win, resignation, timeout, or threefold repetition on any board.
 
 The current room model creates two boards by default. Every seat on every
 board must be occupied before the room starts when manual assignment is used.

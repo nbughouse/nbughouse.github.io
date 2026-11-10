@@ -4,6 +4,7 @@ import { Chess, Color, invertColor, PieceType } from "./chess";
 import {
     GameConfig,
     hasInitialBoardVariant,
+    normalizeInitialBoard,
 } from "./config";
 import { Player, PlayerStatus } from "./player";
 
@@ -303,7 +304,7 @@ export class Room {
             config.initialBoard.trim().length > 0 &&
             this.game.config.initialBoard !== config.initialBoard.trim()
         ) {
-            this.game.config.initialBoard = config.initialBoard.trim();
+            this.game.config.initialBoard = normalizeInitialBoard(config.initialBoard.trim());
             changed = true;
             initialBoardChanged = true;
         }
@@ -480,6 +481,8 @@ export class Game {
         currentTime: number = Date.now(),
     ): void {
         const match = this.matches[matchIndex];
+        const rules = this.getMoveRules();
+        for (const board of this.matches) board.chess.recordRepetition(rules);
         const result = match.chess.doMove(
             move,
             false,
@@ -489,6 +492,14 @@ export class Game {
             this.getPocketCooldownMs(),
         );
         this.moveResultEffects(matchIndex, move, result, currentTime);
+        // Captures and shared drops can also change another board's pockets.
+        for (const board of this.matches) board.chess.recordRepetition(rules);
+    }
+
+    checkThreefoldRepetition(): number | undefined {
+        const rules = this.getMoveRules();
+        const index = this.matches.findIndex(match => match.chess.isThreefoldRepetition(rules));
+        return index < 0 ? undefined : index;
     }
 
     canMove(
@@ -504,6 +515,7 @@ export class Game {
     }
 
     getMoveRules(): MoveRules {
+        const duck = hasInitialBoardVariant(this.config.initialBoard, "duck");
         const koedem = hasInitialBoardVariant(
             this.config.initialBoard,
             "koedem",
@@ -513,7 +525,8 @@ export class Game {
             "taijitu",
         );
         return {
-            allowKingCapture: koedem || taijitu,
+            duck,
+            allowKingCapture: koedem || taijitu || duck,
             forcePocketKingDrop: koedem,
             accolade: hasInitialBoardVariant(
                 this.config.initialBoard,
@@ -525,7 +538,8 @@ export class Game {
     }
 
     checkCapturedKing(matchIndex: number, move: Move): Team | undefined {
-        if (!hasInitialBoardVariant(this.config.initialBoard, "taijitu"))
+        if (!hasInitialBoardVariant(this.config.initialBoard, "taijitu") &&
+            !hasInitialBoardVariant(this.config.initialBoard, "duck"))
             return undefined;
         if (move.to.loc !== "board") return undefined;
 
@@ -540,7 +554,9 @@ export class Game {
         result: MoveResult,
         currentTime: number,
     ): void {
+        if (move.from.loc === "pocket" && move.from.type === PieceType.DUCK) return;
         if (result.captured) {
+            if (this.getMoveRules().duck && result.captured.type === PieceType.KING) return;
             for (let index = 0; index < this.matches.length; index++) {
                 if (index === matchID) continue;
                 if (

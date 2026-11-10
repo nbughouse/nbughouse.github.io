@@ -72,46 +72,26 @@
 /* Ping Indicator */
 .ping-indicator {
    display: inline-flex;
-   flex-direction: column;
    align-items: center;
+   justify-content: center;
    vertical-align: middle;
-   gap: 0.25vh;
    justify-self: end;
    width: 3.75vh;
 }
 
-.ping-bars {
-   display: flex;
-   align-items: baseline;
-   gap: 0.125vh;
+.ping-dot {
+   width: 1.5vh;
+   height: 1.5vh;
+   border-radius: 50%;
+   background: var(--ping-color, var(--surface-raised));
+   box-shadow: var(--shadow-bottom);
+   transition: background-color 180ms ease;
 }
 
-.ping-bar {
-   opacity: 0.3;
-   border-radius: 999px;
-   background-color: var(--surface);
-   width: 0.5vh;
-}
-
-.ping-bar:nth-child(1) {
-   height: 0.625vh;
-}
-
-.ping-bar:nth-child(2) {
-   height: 1.125vh;
-}
-
-.ping-bar:nth-child(3) {
-   height: 1.625vh;
-}
-
-.ping-bar:nth-child(4) {
-   height: 2.125vh;
-}
-
-.ping-text {
-   font-size: 1.4vh;
-   text-align: center;
+@media (prefers-reduced-motion: reduce) {
+   .ping-dot {
+      transition: none;
+   }
 }
 
 /* Player List */

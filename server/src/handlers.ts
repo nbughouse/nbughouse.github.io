@@ -251,11 +251,10 @@ export function setupHandlers(socket: GameSocket): void {
         if (!board || (color !== Color.WHITE && color !== Color.BLACK)) return;
 
         const currentTime = Date.now();
-        const movingPiece = board.chess.getPiece(move.from);
         if (
             board.getPlayer(color)?.id !== socket.player.id ||
-            movingPiece?.color !== color ||
             !board.chess.isLegal(move, false, socket.room.game.getMoveRules()) ||
+            board.chess.getPiece(move.from)?.color !== color ||
             !socket.room.game.canMove(boardID, move, currentTime)
         )
             return;
@@ -275,11 +274,14 @@ export function setupHandlers(socket: GameSocket): void {
             currentTime,
         );
 
+        const fowledWinner = board.chess.isFowled(socket.room.game.getMoveRules())
+            ? board.getTeam(board.chess.turn) : undefined;
         const kingWinner =
-            capturedKingWinner ?? socket.room.game.checkKingAccumulation();
+            capturedKingWinner ?? socket.room.game.checkKingAccumulation() ?? fowledWinner;
         if (kingWinner) {
             const kingCaptureReason = capturedKingWinner
                 ? "captured the king"
+                : fowledWinner ? "won by fowling (no legal moves)"
                 : "captured all kings";
             recordCompletedGame(socket.room);
             socket.room.endRoom(kingWinner);
@@ -323,6 +325,15 @@ export function setupHandlers(socket: GameSocket): void {
                 "room-host-updated",
                 socket.room.hostID,
             );
+        } else {
+            const repeatedBoard = socket.room.game.checkThreefoldRepetition();
+            if (repeatedBoard === undefined) return;
+            const reason = `Draw by threefold repetition on board ${repeatedBoard + 1}.`;
+            recordCompletedGame(socket.room);
+            socket.room.endRoom();
+            recordRoomServerChat(socket.room, reason);
+            io.to(socket.room.code).emit("ended-room", undefined, reason, currentTime);
+            io.to(socket.room.code).emit("room-host-updated", socket.room.hostID);
         }
     });
 

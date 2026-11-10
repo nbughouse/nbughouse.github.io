@@ -7,6 +7,10 @@
 	<meta http-equiv="Content-Security-Policy"
 		content="default-src 'self'; script-src 'self' https://cdn.socket.io; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss: http: https:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" />
 	<title>Bughouse</title>
+	<style>
+		/* Keep inactive screens hidden before external styles finish loading. */
+		.hidden { display: none !important; }
+	</style>
 	<link rel="stylesheet" href="/styles/base.css" />
 	<link rel="stylesheet" href="/styles/menu-background.css" />
 	<link rel="stylesheet" href="/styles/menu.css" />
@@ -61,7 +65,7 @@
 						<div id="join-form">
 							<label class="join-field" for="join-room-code-input">
 								<span>Match ID</span>
-								<input type="text" id="join-room-code-input" maxlength="4" autocomplete="off"
+								<input type="text" id="join-room-code-input" placeholder="XXXX" maxlength="4" autocomplete="off"
 									required />
 							</label>
 							<label class="join-field" for="join-player-name-input">
@@ -259,20 +263,15 @@
 	</div>
 
 	<!-- LOBBY + GAME SCREEN -->
-	<div id="game" class="screen hidden">
+	<div id="game" class="screen hidden" style="visibility: hidden" inert>
 		<div id="game-sidebar">
 			<div id="sidebar-header">
 				<button id="leave-game-btn" type="button" aria-label="Leave room"></button>
 				<div id="game-title">
 					<button id="game-room-code" class="button-flat" type="button" aria-label="Copy room link"></button>
 				</div>
-				<div class="ping-indicator" id="ping-indicator" title="Ping: waiting..." aria-label="Ping: waiting...">
-					<div class="ping-bars">
-						<div class="ping-bar" data-bar-index="0"></div>
-						<div class="ping-bar" data-bar-index="1"></div>
-						<div class="ping-bar" data-bar-index="2"></div>
-						<div class="ping-bar" data-bar-index="3"></div>
-					</div>
+				<div class="ping-indicator" id="ping-indicator" title="Connection" aria-label="Connection">
+					<span class="ping-dot" aria-hidden="true"></span>
 				</div>
 			</div>
 			<div id="lobby-action-row">
@@ -398,6 +397,11 @@
 							<span class="accolade-badge bishop white"></span>
 						</span>
 						<span aria-hidden="true">Accolade</span>
+					</button>
+					<button class="room-variant-button" type="button" data-initial-board="duck" aria-pressed="false"
+						aria-label="Duck" title="Move a piece, then place the blocking duck. Capture the king to win.">
+						<img src="%BASE_URL%assets/img/duck.svg" alt="" aria-hidden="true" />
+						<span aria-hidden="true">Duck</span>
 					</button>
 				</div>
 				<div id="chat-messages">

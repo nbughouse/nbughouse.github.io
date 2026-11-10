@@ -180,13 +180,13 @@ export function initGameSocket(): void {
             if (areClientClocksEnabled()) currentMatch.updateTime(newTime);
 
             if (
-                rules.turnless &&
+                (rules.turnless || rules.duck) &&
                 currentMatch.queued.moves[0] &&
                 movesEqual(currentMatch.queued.moves[0], move)
             )
                 currentMatch.queued.moves.shift();
             else if (
-                !rules.turnless &&
+                !rules.turnless && !rules.duck &&
                 currentMatch.queued.color === currentMatch.chess.turn
             )
                 currentMatch.queued.moves.shift();
@@ -213,7 +213,7 @@ export function initGameSocket(): void {
             updateUIAllBoards();
 
             if (
-                !rules.turnless &&
+                !rules.turnless && !rules.duck &&
                 currentMatch.queued.moves[0] &&
                 currentMatch.chess.isLegal(
                     currentMatch.queued.moves[0],

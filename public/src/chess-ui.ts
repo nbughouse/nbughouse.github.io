@@ -16,7 +16,6 @@ import { visualFlipped } from "./match-ui";
 import { gs } from "./session";
 import { getAssetPath } from "./app-paths";
 import { boardThemes } from "./settings";
-import { refreshMenuBackground } from "./menu-background";
 
 // MARK: Global Variables
 
@@ -173,6 +172,8 @@ function isFlipped(id: number): boolean {
 
 function isMyPiece(boardID: number, piece: Piece): boolean {
     return (
+        piece.type !== PieceType.DUCK &&
+        !getVisualChess(boardID).chess.duckPending &&
         gs.room.status === RoomStatus.PLAYING &&
         gs.room.game.matches[boardID].getPlayer(piece.color)?.id ===
             gs.player.id
@@ -186,6 +187,7 @@ function canUsePositionNow(boardID: number, pos: Position): boolean {
 
 function getPieceClassNames(piece: Piece): string[] {
     const pieceClassByType: Record<PieceType, string> = {
+        [PieceType.DUCK]: "duck",
         [PieceType.KING]: "king",
         [PieceType.QUEEN]: "queen",
         [PieceType.ROOK]: "rook",
@@ -423,7 +425,6 @@ export function applyAllChessSettings(): void {
     applyPieceTheme();
     for (const board of document.querySelectorAll(".board"))
         applyBoardTheme(board as HTMLElement);
-    refreshMenuBackground();
     if (gs.room) {
         for (let index = 0; index < gs.room.game.matches.length; index++)
             updateUIChess(index);
@@ -451,7 +452,6 @@ function applyPieceTheme(): void {
         document.head.append(link);
     }
 
-    link.onload = refreshMenuBackground;
     link.href = getAssetPath(`pieces/${gs.settings.pieceTheme}.css`);
 }
 
@@ -698,14 +698,16 @@ function executeMove(id: number, move: Move, premove: boolean): void {
     const rules = gs.room.game.getMoveRules();
     if (rules.turnless) premove = false;
 
-    if (!premove) gs.socket.emit("move-board", id, selected!.piece.color, move);
+    const color = selected?.piece.color ?? board.turn;
+    if (!premove) gs.socket.emit("move-board", id, color, move);
 
-    gs.room.game.matches[id].queued.color = selected!.piece.color;
+    gs.room.game.matches[id].queued.color = color;
     gs.room.game.matches[id].queued.moves.push(move);
 
     playMoveSound(board.getLegalMoveType(move, premove, rules));
 
     deselectPiece();
+    if (rules.duck) updateUIChess(id);
 }
 
 function attemptMove(id: number, to: Position): boolean {
@@ -721,6 +723,7 @@ function attemptMove(id: number, to: Position): boolean {
     const premove =
         !rules.turnless && board.turn !== board.getPiece(move.from)?.color;
 
+    if (rules.duck && premove) return false;
     if (premove && !gs.settings.premoves) return false;
     if (!canUsePositionNow(id, move.from)) return false;
     if (!board.isLegal(move, premove, rules)) return false;
@@ -765,6 +768,21 @@ export function updateUIChess(id: number): void {
 
     if (!boardElement) return;
 
+    const duckPending = !!gs.room.game.getMoveRules().duck && chess.duckPending;
+    const canPlaceDuck = duckPending && gs.room.status === RoomStatus.PLAYING &&
+        gs.room.game.matches[id].getPlayer(chess.turn)?.id === gs.player.id;
+    boardElement.classList.toggle("duck-placement", canPlaceDuck);
+    let prompt = boardElement.querySelector<HTMLElement>(".duck-placement-prompt");
+    if (duckPending) {
+        if (!prompt) {
+            prompt = document.createElement("div");
+            prompt.className = "duck-placement-prompt";
+            prompt.setAttribute("role", "status");
+            boardElement.append(prompt);
+        }
+        prompt.textContent = `${chess.turn === Color.WHITE ? "White" : "Black"}: place the duck`;
+    } else prompt?.remove();
+
     const squares = boardElement.querySelectorAll(`.square`);
     const flipped = isFlipped(id);
     const replaceAnimatingPieces =
@@ -804,7 +822,7 @@ export function updateUIChess(id: number): void {
         const piece = chess.getPiece(pos);
         if (piece) {
             const isMyTurn = chess.turn === piece.color;
-            const isMyPiece =
+            const isMyPiece = piece.type !== PieceType.DUCK && !duckPending &&
                 gs.room.status === RoomStatus.PLAYING &&
                 gs.room.game.matches[id].getPlayer(piece.color)?.id ===
                     gs.player.id;
@@ -815,7 +833,7 @@ export function updateUIChess(id: number): void {
                 !cooling &&
                 (gs.room.game.getMoveRules().turnless ||
                     isMyTurn ||
-                    gs.settings.premoves);
+                    (!gs.room.game.getMoveRules().duck && gs.settings.premoves));
             element.style.cursor =
                 canMoveNow && gs.settings.movementMode !== "click"
                     ? "grab"
@@ -835,7 +853,7 @@ export function updateUIChess(id: number): void {
             );
             syncSquarePiece(element, piece, hidden, replaceAnimatingPieces);
         } else {
-            element.style.cursor = "default";
+            element.style.cursor = canPlaceDuck ? "pointer" : "default";
             element.classList.remove("cooling");
             syncSquareCooldownOverlay(element, 0, 0);
             syncSquarePiece(element, undefined, false, replaceAnimatingPieces);
@@ -1206,6 +1224,15 @@ function updateAnnotations(id: number): void {
     }
 
     const { chess, marks } = getVisualChess(id);
+    if (chess.duckPending && gs.room.game.getMoveRules().duck &&
+        gs.room.status === RoomStatus.PLAYING &&
+        gs.room.game.matches[id].getPlayer(chess.turn)?.id === gs.player.id &&
+        gs.settings.showLegalMoves) {
+        for (let row = 0; row < 8; row++)
+            for (let col = 0; col < 8; col++)
+                if (!chess.getPiece(createPosition(row, col)))
+                    annotateSquare(id, row, col, ["legal-move"]);
+    }
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
             if (marks.premoved[r][c] || marks.marked[r][c])
@@ -1449,12 +1476,24 @@ function handleSquareMouseDown(event: MouseEvent): void {
 
     event.preventDefault();
 
+    if (event.button !== 0) return;
+    if (gs.room.game.getMoveRules().duck && board.duckPending) {
+        if (gs.room.status !== RoomStatus.PLAYING ||
+            gs.room.game.matches[id].getPlayer(board.turn)?.id !== gs.player.id) return;
+        const move = { from: createPosition(board.turn, PieceType.DUCK), to: pos };
+        if (board.isLegal(move, false, gs.room.game.getMoveRules())) {
+            deselectPiece();
+            executeMove(id, move, false);
+        }
+        return;
+    }
+
     const canSelectTarget =
         targetPiece &&
         isMyPiece(id, targetPiece) &&
         canUsePositionNow(id, pos) &&
         (gs.room.game.getMoveRules().turnless ||
-            gs.settings.premoves ||
+            (!gs.room.game.getMoveRules().duck && gs.settings.premoves) ||
             board.turn === targetPiece.color);
 
     if (selected?.boardID === id) {
@@ -1505,6 +1544,10 @@ function handleSquareMouseUp(event: MouseEvent): void {
     const rules = gs.room.game.getMoveRules();
     const premove =
         !rules.turnless && board.turn !== board.getPiece(move.from)?.color;
+    if (rules.duck && premove) {
+        dropSelectedPiece();
+        return;
+    }
     if (premove && !gs.settings.premoves) {
         dropSelectedPiece();
         return;
@@ -1580,6 +1623,10 @@ function handlePocketMouseDown(event: MouseEvent): void {
 
     const target = event.target as HTMLElement;
     const { pos, id } = getPositionFromElement(target);
+
+    if (gs.room.game.getMoveRules().duck &&
+        (getVisualChess(id).chess.duckPending ||
+            (pos.loc === "pocket" && pos.color !== getVisualChess(id).chess.turn))) return;
 
     event.preventDefault();
 

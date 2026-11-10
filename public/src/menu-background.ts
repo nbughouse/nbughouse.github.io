@@ -1,159 +1,39 @@
-import { getAssetPath } from "./app-paths";
+import { Player } from "@shared/player";
+import { Room } from "@shared/room";
+import { endGameUI, rebuildRoomBoardElements } from "./game-ui";
+import { updateUIAllChat } from "./chat-ui";
+import { clearLastMoves } from "./chess-ui";
+import { clearLatestWinners, resetLowTimeWarnings, setVisualFlipped } from "./match-ui";
+import { resetSidebarUI } from "./sidebar-ui";
 import { sn } from "./session";
-import { boardThemes } from "./settings";
 
-const svgNamespace = "http://www.w3.org/2000/svg";
-const htmlNamespace = "http://www.w3.org/1999/xhtml";
-const pieceScale = 0.941;
-const pieceInset = (1 - pieceScale) / 2;
-let boardClipIndex = 0;
-const backRank = [
-    "rook",
-    "knight",
-    "bishop",
-    "queen",
-    "king",
-    "bishop",
-    "knight",
-    "rook",
-] as const;
-export function initMenuBackground(): void {
-    const boardscape = document.querySelector<HTMLElement>("#menu-boardscape");
-    if (!boardscape || boardscape.childElementCount > 0) return;
+export function initMenuBackground(reset = false): void {
+    const game = document.querySelector<HTMLElement>("#game");
+    if (game) game.inert = true;
+    if (!reset && document.querySelector("#game-area .match-container")) return;
 
-    const laneCount = 3;
-    const boardsPerSequence = 3;
-
-    for (let laneIndex = 0; laneIndex < laneCount; laneIndex++) {
-        const lane = document.createElement("div");
-        lane.className = `menu-gallery-lane ${
-            laneIndex % 2 === 0 ? "moves-up" : "moves-down"
-        }`;
-
-        const strip = document.createElement("div");
-        strip.className = "menu-gallery-strip";
-
-        strip.append(
-            createBoardSequence(boardsPerSequence),
-            createBoardSequence(boardsPerSequence),
-        );
-        lane.append(strip);
-        boardscape.append(lane);
+    // Render the initial empty lobby through the same renderer used after joining.
+    // Keep this local state out of the connected session once rendering finishes.
+    const room = sn.room;
+    const player = sn.player;
+    try {
+        sn.room = new Room("");
+        sn.player ??= new Player("", "");
+        clearLastMoves();
+        clearLatestWinners();
+        resetLowTimeWarnings();
+        setVisualFlipped(false);
+        resetSidebarUI();
+        rebuildRoomBoardElements();
+        endGameUI();
+        updateUIAllChat();
+        const roomCode = document.querySelector("#game-room-code");
+        if (roomCode) roomCode.textContent = "";
+        const chatInput = document.querySelector<HTMLInputElement>("#chat-input");
+        if (chatInput) chatInput.value = "";
+    } finally {
+        sn.room = room;
+        sn.player = player;
     }
-
-    refreshMenuBackground();
-}
-
-export function refreshMenuBackground(): void {
-    for (const board of document.querySelectorAll<SVGSVGElement>(
-        ".menu-gallery-board",
-    )) {
-        board.replaceChildren();
-        const content = appendBoardClip(board);
-        appendBoardArtwork(content);
-        appendStartingPosition(content);
-    }
-}
-
-function createBoardSequence(boardCount: number): HTMLDivElement {
-    const sequence = document.createElement("div");
-    sequence.className = "menu-gallery-sequence";
-    for (let index = 0; index < boardCount; index++) {
-        sequence.append(createMenuBoardElement());
-    }
-    return sequence;
-}
-
-function createMenuBoardElement(): SVGSVGElement {
-    const board = document.createElementNS(svgNamespace, "svg");
-    board.classList.add("menu-gallery-board");
-    board.setAttribute("viewBox", "0 0 8 8");
-    board.setAttribute("aria-hidden", "true");
-    board.setAttribute("focusable", "false");
-    return board;
-}
-
-function appendBoardClip(board: SVGSVGElement): SVGGElement {
-    const clipID = `menu-gallery-board-clip-${boardClipIndex++}`;
-    const definitions = document.createElementNS(svgNamespace, "defs");
-    const clipPath = document.createElementNS(svgNamespace, "clipPath");
-    clipPath.id = clipID;
-
-    const clipRect = document.createElementNS(svgNamespace, "rect");
-    clipRect.setAttribute("width", "8");
-    clipRect.setAttribute("height", "8");
-    clipRect.setAttribute("rx", "0.18");
-    clipPath.append(clipRect);
-    definitions.append(clipPath);
-
-    const content = document.createElementNS(svgNamespace, "g");
-    content.setAttribute("clip-path", `url(#${clipID})`);
-    board.append(definitions, content);
-    return content;
-}
-
-function appendBoardArtwork(board: SVGGElement): void {
-    const theme =
-        boardThemes.find((current) => current.id === sn.settings.boardTheme) ||
-        boardThemes[0];
-
-    if (theme.image) {
-        const image = document.createElementNS(svgNamespace, "image");
-        image.setAttribute("href", getAssetPath(`board/${theme.image}`));
-        image.setAttribute("width", "8");
-        image.setAttribute("height", "8");
-        image.setAttribute("preserveAspectRatio", "none");
-        board.append(image);
-        return;
-    }
-
-    const lightSquares = document.createElementNS(svgNamespace, "rect");
-    lightSquares.setAttribute("width", "8");
-    lightSquares.setAttribute("height", "8");
-    lightSquares.setAttribute("fill", theme.light || "#e9d7b4");
-
-    const darkSquares = document.createElementNS(svgNamespace, "path");
-    darkSquares.setAttribute("fill", theme.dark || "#b18967");
-    darkSquares.setAttribute(
-        "d",
-        Array.from({ length: 64 }, (_, index) => {
-            const row = Math.floor(index / 8);
-            const column = index % 8;
-            return (row + column) % 2 === 1
-                ? `M${column} ${row}h1v1h-1z`
-                : "";
-        }).join(""),
-    );
-    board.append(lightSquares, darkSquares);
-}
-
-function appendStartingPosition(board: SVGGElement): void {
-    for (let column = 0; column < 8; column++) {
-        appendPiece(board, backRank[column], "black", 0, column);
-        appendPiece(board, "pawn", "black", 1, column);
-        appendPiece(board, "pawn", "white", 6, column);
-        appendPiece(board, backRank[column], "white", 7, column);
-    }
-}
-
-function appendPiece(
-    board: SVGGElement,
-    type: string,
-    color: "white" | "black",
-    row: number,
-    column: number,
-): void {
-    // Theme pieces are CSS background images. Keeping that image on an HTML
-    // element avoids loading an SVG data URL as a nested SVG <image>, which is
-    // unreliable in some browsers for larger themes such as Alpha and Companion.
-    const container = document.createElementNS(svgNamespace, "foreignObject");
-    container.setAttribute("x", (column + pieceInset).toString());
-    container.setAttribute("y", (row + pieceInset).toString());
-    container.setAttribute("width", pieceScale.toString());
-    container.setAttribute("height", pieceScale.toString());
-
-    const piece = document.createElementNS(htmlNamespace, "div");
-    piece.classList.add("menu-gallery-piece", "piece", type, color);
-    container.append(piece);
-    board.append(container);
+    game?.style.removeProperty("visibility");
 }

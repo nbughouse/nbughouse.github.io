@@ -5,6 +5,9 @@
 	"main": "dist/server/index.js",
 	"type": "module",
 	"scripts": {
+		"test": "node --import tsx --test tests/variants/*.test.ts",
+		"test:typecheck": "tsc --project tests/tsconfig.json",
+		"test:variants": "node --import tsx --test tests/variants/*.test.ts",
 		"build": "npm run build:shared && npm run build:fix-esm && npm run build:client && npm run build:server && npm run build:alias",
 		"build:frontend": "npm run build:shared && npm run build:fix-esm && npm run build:client",
 		"build:pages": "npm run build:frontend && cp dist/public/index.html dist/public/404.html && touch dist/public/.nojekyll",
@@ -31,7 +34,7 @@
 	},
 	"devDependencies": {
 		"@types/express": "^4.17.17",
-		"@types/node": "^20.19.41",
+		"@types/node": "^20.19.43",
 		"@types/ws": "^8.5.4",
 		"concurrently": "^8.2.2",
 		"tsc-alias": "^1.8.17",

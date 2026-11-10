@@ -17,6 +17,7 @@ import { gs } from "./session";
 let gridMode = false;
 let gridLayoutObserver: ResizeObserver | undefined;
 let dualBoardPrimaryID: number | undefined;
+const boardLayoutAnimations = new WeakMap<HTMLElement, Animation>();
 
 export function initGameControls(): void {
     initGridLayoutObserver();
@@ -25,6 +26,7 @@ export function initGameControls(): void {
         .querySelector("#grid-toggle-btn")
         ?.addEventListener("click", toggleGridMode);
     document.addEventListener("keydown", (event: Event) => {
+        if (document.querySelector<HTMLElement>("#game")?.inert) return;
         const keyEvent = event as KeyboardEvent;
         const target = keyEvent.target as HTMLElement;
         if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
@@ -55,6 +57,7 @@ export function initGameControls(): void {
 
 export function showRoomElements(): void {
     const gameScreen = document.querySelector("#game") as HTMLDivElement;
+    gameScreen.inert = false;
     for (const screen of document.querySelectorAll(".screen"))
         screen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
@@ -68,10 +71,10 @@ export function rebuildRoomBoardElements(): void {
     dualBoardPrimaryID = undefined;
     for (const container of boardsArea.querySelectorAll(".game-container"))
         container.remove();
-    for (const container of boardsArea.querySelectorAll(".match-container"))
-        container.remove();
-
-    for (let index = 0; index < gs.room.game.matches.length; index++)
+    const matches = Array.from(boardsArea.querySelectorAll(".match-container"));
+    for (let index = gs.room.game.matches.length; index < matches.length; index++)
+        matches[index].remove();
+    for (let index = matches.length; index < gs.room.game.matches.length; index++)
         createMatchElements(index);
 
     setGridMode(shouldForceGridMode(), true);
@@ -87,7 +90,8 @@ export function rebuildRoomBoardElements(): void {
 // MARK: Scrolling UI
 
 function getTotalBoards(): number {
-    return gs.room.game.matches.length || 1;
+    return gs.room?.game.matches.length ||
+        document.querySelectorAll("#game-area .match-container").length || 1;
 }
 
 function updateBoardNavigationVisibility(): void {
@@ -304,6 +308,20 @@ function updateGridLayout(): void {
     const boardCount = matches.length;
     if (boardCount === 0) return;
 
+    const useDualBoardUI =
+        gs.room?.status === RoomStatus.PLAYING &&
+        gs.settings.dualBoardUI &&
+        boardCount === 2;
+    const previousBounds = new Map<HTMLElement, DOMRect>();
+    if (gameArea.classList.contains("dual-board-ui") !== useDualBoardUI) {
+        for (const match of matches) {
+            const element = match as HTMLElement;
+            if (useDualBoardUI)
+                previousBounds.set(element, element.getBoundingClientRect());
+            boardLayoutAnimations.get(element)?.cancel();
+        }
+    }
+
     const style = getComputedStyle(gameArea);
     const availableWidth =
         gameArea.clientWidth -
@@ -342,8 +360,6 @@ function updateGridLayout(): void {
         }
     }
 
-    const useDualBoardUI = gs.settings.dualBoardUI && boardCount === 2;
-
     gameArea.classList.toggle("dual-board-ui", useDualBoardUI);
 
     if (useDualBoardUI) {
@@ -351,11 +367,7 @@ function updateGridLayout(): void {
         const preferredPrimaryID = getPreferredPrimaryBoardID(
             controlledBoardIDs,
         );
-        if (gs.room.status === RoomStatus.LOBBY) {
-            if (preferredPrimaryID !== undefined)
-                dualBoardPrimaryID = preferredPrimaryID;
-            else dualBoardPrimaryID ??= 0;
-        } else if (dualBoardPrimaryID === undefined) {
+        if (dualBoardPrimaryID === undefined) {
             dualBoardPrimaryID = preferredPrimaryID ?? 0;
         }
 
@@ -383,19 +395,45 @@ function updateGridLayout(): void {
             element.style.setProperty("--board-size", `${width}px`);
             element.style.setProperty("--square-size", `${width / 8}px`);
         }
-        return;
+    } else {
+        dualBoardPrimaryID = undefined;
+        gameArea.style.gridTemplateColumns = `repeat(${bestCols}, auto)`;
+
+        for (const match of matches) {
+            const m = match as HTMLElement;
+            m.style.order = "";
+            // Apply the calculated width, height follows aspect ratio
+            m.style.width = `${bestW}px`;
+            m.style.height = `${bestW * (1 / matchRatio)}px`;
+            m.style.setProperty("--board-size", `${bestW}px`);
+            m.style.setProperty("--square-size", `${bestW / 8}px`);
+        }
     }
 
-    gameArea.style.gridTemplateColumns = `repeat(${bestCols}, auto)`;
+    animateBoardLayout(previousBounds);
+}
 
-    for (const match of matches) {
-        const m = match as HTMLElement;
-        m.style.order = "";
-        // Apply the calculated width, height follows aspect ratio
-        m.style.width = `${bestW}px`;
-        m.style.height = `${bestW * (1 / matchRatio)}px`;
-        m.style.setProperty("--board-size", `${bestW}px`);
-        m.style.setProperty("--square-size", `${bestW / 8}px`);
+function animateBoardLayout(previousBounds: Map<HTMLElement, DOMRect>): void {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    // Keep each board visually at its old position and size, then move it
+    // into the new layout. This also animates changes to the board order.
+    for (const [element, before] of previousBounds) {
+        const after = element.getBoundingClientRect();
+        if (!before.width || !before.height || !after.width || !after.height)
+            continue;
+
+        const animation = element.animate(
+            [
+                {
+                    transformOrigin: "top left",
+                    transform: `translate(${before.left - after.left}px, ${before.top - after.top}px) scale(${before.width / after.width}, ${before.height / after.height})`,
+                },
+                { transformOrigin: "top left", transform: "none" },
+            ],
+            { duration: 500, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+        );
+        boardLayoutAnimations.set(element, animation);
     }
 }
 
