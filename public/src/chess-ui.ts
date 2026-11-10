@@ -16,6 +16,7 @@ import { visualFlipped } from "./match-ui";
 import { gs } from "./session";
 import { getAssetPath } from "./app-paths";
 import { boardThemes } from "./settings";
+import { BoardPieceRenderer, type PieceTarget } from "./piece-motion";
 
 // MARK: Global Variables
 
@@ -51,19 +52,12 @@ interface VisualChessState {
 
 const visualChessStates: Map<number, VisualChessState> = new Map();
 const lastMoves: Map<number, Move> = new Map();
-const lastMoveAnimationSerials: Map<number, number> = new Map();
-const animatedMoveSerials: Map<number, number> = new Map();
-const suppressedMoveAnimations: Map<number, string[]> = new Map();
-const lastMoveAnimationPieces: Map<
-    number,
-    {
-        from?: Piece;
-        to?: Piece;
-        suppressTravel: boolean;
-    }
-> = new Map();
+const boardPieceRenderers = new Map<number, {
+    board: HTMLElement;
+    renderer: BoardPieceRenderer;
+}>();
+const visualMoves = new Map<number, { move: Move; suppressTravel: boolean }>();
 const cooldownRefreshTimers: Map<number, number> = new Map();
-let nextMoveAnimationSerial = 1;
 
 interface BoardArrow {
     from: BoardPosition;
@@ -233,12 +227,22 @@ export function createPieceElement(piece: Piece): HTMLDivElement {
     return element;
 }
 
-function pieceElementMatches(element: HTMLElement, piece: Piece): boolean {
-    return (
-        element.dataset.pieceType === piece.type &&
-        element.dataset.pieceColor === piece.color.toString() &&
-        (element.dataset.combinedWith || undefined) === piece.combinedWith
-    );
+function updatePieceElement(element: HTMLElement, piece: Piece): void {
+    const replacement = createPieceElement(piece);
+    element.className = replacement.className;
+    element.dataset.pieceType = piece.type;
+    element.dataset.pieceColor = piece.color.toString();
+    if (piece.combinedWith) element.dataset.combinedWith = piece.combinedWith;
+    else delete element.dataset.combinedWith;
+    element.replaceChildren(...Array.from(replacement.childNodes));
+
+    const duration = getPieceAnimationDuration();
+    const badge = element.querySelector<HTMLElement>(".accolade-badge");
+    if (badge && duration > 0)
+        badge.animate([
+            { transform: "scale(0.25) rotate(-14deg)", opacity: 0 },
+            { transform: "scale(1) rotate(0)", opacity: 1 },
+        ], { duration, easing: "cubic-bezier(0.2, 0.9, 0.25, 1.35)" });
 }
 
 function syncSquareLabel(
@@ -264,38 +268,6 @@ function syncSquareLabel(
     label.className = className;
     label.textContent = text;
     square.prepend(label);
-}
-
-function syncSquarePiece(
-    square: HTMLElement,
-    piece: Piece | undefined,
-    hidden: boolean,
-    replaceAnimating: boolean,
-): void {
-    const elements = Array.from(
-        square.querySelectorAll<HTMLElement>(":scope > .piece"),
-    );
-    let element = elements[0];
-
-    if (!piece) {
-        for (const current of elements) current.remove();
-        return;
-    }
-
-    if (
-        !element ||
-        !pieceElementMatches(element, piece) ||
-        (replaceAnimating &&
-            (element.classList.contains("animating") ||
-                element.classList.contains("accolade-combine-result")))
-    ) {
-        for (const current of elements) current.remove();
-        element = createPieceElement(piece);
-        element.addEventListener("dragstart", () => false);
-        square.append(element);
-    }
-
-    element.style.opacity = hidden ? "0" : "";
 }
 
 function syncSquareCooldownOverlay(
@@ -693,7 +665,12 @@ function deselectPiece(): void {
 
 // MARK: Move Execution
 
-function executeMove(id: number, move: Move, premove: boolean): void {
+function executeMove(
+    id: number,
+    move: Move,
+    premove: boolean,
+    suppressTravel = false,
+): void {
     const board = getVisualChess(id).chess;
     const rules = gs.room.game.getMoveRules();
     if (rules.turnless) premove = false;
@@ -703,11 +680,13 @@ function executeMove(id: number, move: Move, premove: boolean): void {
 
     gs.room.game.matches[id].queued.color = color;
     gs.room.game.matches[id].queued.moves.push(move);
+    visualMoves.set(id, { move, suppressTravel });
 
     playMoveSound(board.getLegalMoveType(move, premove, rules));
 
-    deselectPiece();
-    if (rules.duck) updateUIChess(id);
+    dropSelectedPiece();
+    selected = undefined;
+    updateUIChess(id);
 }
 
 function attemptMove(id: number, to: Position): boolean {
@@ -785,8 +764,7 @@ export function updateUIChess(id: number): void {
 
     const squares = boardElement.querySelectorAll(`.square`);
     const flipped = isFlipped(id);
-    const replaceAnimatingPieces =
-        lastMoveAnimationSerials.get(id) !== animatedMoveSerials.get(id);
+    const targets: PieceTarget[] = [];
 
     for (const [index, square] of squares.entries()) {
         const element = square as HTMLElement;
@@ -851,16 +829,27 @@ export function updateUIChess(id: number): void {
                     selected.boardID === id &&
                     positionsEqual(selected.pos, pos),
             );
-            syncSquarePiece(element, piece, hidden, replaceAnimatingPieces);
+            targets.push({ pos, piece, square: element, hidden });
         } else {
             element.style.cursor = canPlaceDuck ? "pointer" : "default";
             element.classList.remove("cooling");
             syncSquareCooldownOverlay(element, 0, 0);
-            syncSquarePiece(element, undefined, false, replaceAnimatingPieces);
         }
     }
 
-    animateLastMove(id);
+    let rendered = boardPieceRenderers.get(id);
+    if (rendered?.board !== boardElement) {
+        rendered?.renderer.clear();
+        rendered = {
+            board: boardElement,
+            renderer: new BoardPieceRenderer(createPieceElement, updatePieceElement),
+        };
+        boardPieceRenderers.set(id, rendered);
+    }
+    const visualMove = visualMoves.get(id);
+    visualMoves.delete(id);
+    rendered.renderer.render(targets, getPieceAnimationDuration(),
+        visualMove?.move, visualMove?.suppressTravel);
 
     const topColor = flipped ? Color.WHITE : Color.BLACK;
     const bottomColor = flipped ? Color.BLACK : Color.WHITE;
@@ -877,203 +866,10 @@ export function updateUIChess(id: number): void {
     scheduleCooldownRefresh(id);
 }
 
-function animateLastMove(boardID: number): void {
-    const move = lastMoves.get(boardID);
-    const serial = lastMoveAnimationSerials.get(boardID);
-    if (!move || !serial || animatedMoveSerials.get(boardID) === serial) return;
-
-    animatedMoveSerials.set(boardID, serial);
-
+function getPieceAnimationDuration(): number {
     const speed = gs.settings.pieceAnimationSpeed;
-    if (
-        speed <= 0 ||
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    )
-        return;
-
-    const animationPieces = lastMoveAnimationPieces.get(boardID);
-    if (
-        animationPieces &&
-        move.to.loc === "board" &&
-        isAccoladeCombination(animationPieces.from, animationPieces.to)
-    ) {
-        animateAccoladeCombination(boardID, move, animationPieces, speed);
-        return;
-    }
-
-    if (move.from.loc !== "board" || move.to.loc !== "board") return;
-
-    const fromSquare = getSquareElement(boardID, move.from);
-    const toSquare = getSquareElement(boardID, move.to);
-    const pieceElement = toSquare.querySelector(".piece") as HTMLElement | null;
-    if (!pieceElement) return;
-
-    const fromRect = fromSquare.getBoundingClientRect();
-    const toRect = toSquare.getBoundingClientRect();
-    const duration = Math.round(300 / speed);
-
-    pieceElement.classList.add("animating");
-    pieceElement.style.setProperty("--piece-move-duration", `${duration}ms`);
-    pieceElement.style.transition = "none";
-    pieceElement.style.transform = `translate(${fromRect.left - toRect.left}px, ${
-        fromRect.top - toRect.top
-    }px)`;
-    pieceElement.getBoundingClientRect();
-
-    window.requestAnimationFrame(() => {
-        pieceElement.style.transition =
-            "transform var(--piece-move-duration) cubic-bezier(0.2, 0, 0, 1)";
-        pieceElement.style.transform = "translate(0, 0)";
-    });
-
-    const cleanup = () => {
-        pieceElement.classList.remove("animating");
-        pieceElement.style.removeProperty("--piece-move-duration");
-        pieceElement.style.transition = "";
-        pieceElement.style.transform = "";
-    };
-
-    pieceElement.addEventListener("transitionend", cleanup, { once: true });
-    window.setTimeout(cleanup, duration + 50);
-}
-
-function isAccoladeCombination(from?: Piece, to?: Piece): boolean {
-    if (!from || !to || from.color !== to.color) return false;
-    if (from.combinedWith || to.combinedWith) return false;
-
-    const partnerTypes = new Set([
-        PieceType.BISHOP,
-        PieceType.ROOK,
-        PieceType.QUEEN,
-        PieceType.PROMOTED_QUEEN,
-    ]);
-    return (
-        (from.type === PieceType.KNIGHT && partnerTypes.has(to.type)) ||
-        (to.type === PieceType.KNIGHT && partnerTypes.has(from.type))
-    );
-}
-
-function animateAccoladeCombination(
-    boardID: number,
-    move: Move,
-    pieces: { from?: Piece; to?: Piece; suppressTravel: boolean },
-    speed: number,
-): void {
-    if (move.to.loc !== "board" || !pieces.from || !pieces.to) return;
-
-    const toSquare = getSquareElement(boardID, move.to);
-    const result = toSquare.querySelector(
-        ":scope > .piece",
-    ) as HTMLElement | null;
-    if (!result?.classList.contains("accolade-piece")) return;
-
-    const fullDuration = Math.round(360 / speed);
-    const revealDuration = Math.round(fullDuration * 0.38);
-    const animateTravel = !pieces.suppressTravel && move.from.loc === "board";
-    const revealDelay = animateTravel ? fullDuration - revealDuration : 0;
-
-    result.classList.add("accolade-combine-result");
-    result.style.setProperty("--accolade-reveal-duration", `${revealDuration}ms`);
-    result.style.setProperty("--accolade-reveal-delay", `${revealDelay}ms`);
-
-    const ghosts: HTMLElement[] = [];
-    if (animateTravel && move.from.loc === "board") {
-        const fromSquare = getSquareElement(boardID, move.from);
-        const fromRect = fromSquare.getBoundingClientRect();
-        const toRect = toSquare.getBoundingClientRect();
-        const movingPiece = createPieceElement(pieces.from);
-        const targetPiece = createPieceElement(pieces.to);
-
-        movingPiece.classList.add(
-            "accolade-combine-layer",
-            "accolade-combine-moving",
-        );
-        targetPiece.classList.add(
-            "accolade-combine-layer",
-            "accolade-combine-target",
-        );
-        movingPiece.style.setProperty(
-            "--accolade-from-x",
-            `${fromRect.left - toRect.left}px`,
-        );
-        movingPiece.style.setProperty(
-            "--accolade-from-y",
-            `${fromRect.top - toRect.top}px`,
-        );
-        movingPiece.style.setProperty(
-            "--accolade-travel-duration",
-            `${fullDuration}ms`,
-        );
-        movingPiece.style.setProperty(
-            "--accolade-reveal-duration",
-            `${revealDuration}ms`,
-        );
-        movingPiece.style.setProperty(
-            "--accolade-reveal-delay",
-            `${revealDelay}ms`,
-        );
-        targetPiece.style.setProperty(
-            "--accolade-reveal-duration",
-            `${revealDuration}ms`,
-        );
-        targetPiece.style.setProperty(
-            "--accolade-reveal-delay",
-            `${revealDelay}ms`,
-        );
-        toSquare.append(targetPiece, movingPiece);
-        ghosts.push(targetPiece, movingPiece);
-    }
-
-    result.getBoundingClientRect();
-    window.requestAnimationFrame(() => {
-        result.classList.add("accolade-combine-active");
-        for (const ghost of ghosts)
-            ghost.classList.add("accolade-combine-active");
-    });
-
-    const cleanup = () => {
-        for (const ghost of ghosts) ghost.remove();
-        result.classList.remove(
-            "accolade-combine-result",
-            "accolade-combine-active",
-        );
-        result.style.removeProperty("--accolade-reveal-duration");
-        result.style.removeProperty("--accolade-reveal-delay");
-    };
-    const totalDuration = animateTravel ? fullDuration : revealDuration;
-    window.setTimeout(cleanup, totalDuration + 60);
-}
-
-export function suppressMoveAnimation(boardID: number, move: Move): void {
-    const suppressedMoves = suppressedMoveAnimations.get(boardID) || [];
-    suppressedMoves.push(getMoveAnimationKey(move));
-    suppressedMoveAnimations.set(boardID, suppressedMoves);
-}
-
-function shouldSuppressMoveAnimation(boardID: number, move: Move): boolean {
-    const suppressedMoves = suppressedMoveAnimations.get(boardID);
-    if (!suppressedMoves) return false;
-
-    const key = getMoveAnimationKey(move);
-    const index = suppressedMoves.indexOf(key);
-    if (index < 0) return false;
-
-    suppressedMoves.splice(index, 1);
-    if (suppressedMoves.length === 0) suppressedMoveAnimations.delete(boardID);
-
-    return true;
-}
-
-function getMoveAnimationKey(move: Move): string {
-    return `${getPositionAnimationKey(move.from)}>${getPositionAnimationKey(
-        move.to,
-    )}:${move.promotion || ""}`;
-}
-
-function getPositionAnimationKey(pos: Position): string {
-    return pos.loc === "board"
-        ? `b:${pos.row}:${pos.col}`
-        : `p:${pos.color}:${pos.type}`;
+    return speed > 0 && !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? Math.round(300 / speed) : 0;
 }
 
 function updatePocket(
@@ -1405,33 +1201,15 @@ function playMoveSound(type: MoveType): void {
 }
 
 export function rememberLastMove(boardID: number, move: Move): void {
-    const chess = gs.room.game.matches[boardID]?.chess;
-    const fromPiece = chess?.getPiece(move.from);
-    const toPiece = chess?.getPiece(move.to);
-    const suppressTravel = shouldSuppressMoveAnimation(boardID, move);
-
     lastMoves.set(boardID, move);
-    lastMoveAnimationPieces.set(boardID, {
-        from: fromPiece ? { ...fromPiece } : undefined,
-        to: toPiece ? { ...toPiece } : undefined,
-        suppressTravel,
-    });
-    const serial = nextMoveAnimationSerial++;
-    lastMoveAnimationSerials.set(boardID, serial);
-    if (suppressTravel && !isAccoladeCombination(fromPiece, toPiece)) {
-        animatedMoveSerials.set(boardID, serial);
-        return;
-    }
-
-    animatedMoveSerials.delete(boardID);
+    visualMoves.set(boardID, { move, suppressTravel: false });
 }
 
 export function clearLastMoves(): void {
     lastMoves.clear();
-    lastMoveAnimationSerials.clear();
-    animatedMoveSerials.clear();
-    suppressedMoveAnimations.clear();
-    lastMoveAnimationPieces.clear();
+    visualMoves.clear();
+    for (const { renderer } of boardPieceRenderers.values()) renderer.clear();
+    boardPieceRenderers.clear();
     for (const timer of cooldownRefreshTimers.values())
         window.clearTimeout(timer);
     cooldownRefreshTimers.clear();
@@ -1567,8 +1345,7 @@ function handleSquareMouseUp(event: MouseEvent): void {
         ) {
             if (gs.settings.autoQueen) {
                 move.promotion = PieceType.QUEEN;
-                suppressMoveAnimation(id, move);
-                executeMove(id, move, premove);
+                executeMove(id, move, premove, true);
             } else {
                 showPromotionDialog(
                     id,
@@ -1576,8 +1353,7 @@ function handleSquareMouseUp(event: MouseEvent): void {
                     selected.piece.color,
                     (pieceType) => {
                         move.promotion = pieceType;
-                        suppressMoveAnimation(id, move);
-                        executeMove(id, move, premove);
+                        executeMove(id, move, premove, true);
                     },
                     deselectPiece,
                 );
@@ -1585,8 +1361,7 @@ function handleSquareMouseUp(event: MouseEvent): void {
             return;
         }
 
-        suppressMoveAnimation(id, move);
-        executeMove(id, move, premove);
+        executeMove(id, move, premove, true);
     } else if (!selected.justSelected && positionsEqual(selected.pos, pos)) {
         deselectPiece();
     } else {

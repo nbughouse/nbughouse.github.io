@@ -5,7 +5,8 @@
 	"main": "dist/server/index.js",
 	"type": "module",
 	"scripts": {
-		"test": "node --import tsx --test tests/variants/*.test.ts",
+		"test": "node --import tsx --test tests/variants/*.test.ts tests/ui/*.test.ts",
+		"test:ui": "node --import tsx --test tests/ui/*.test.ts",
 		"test:typecheck": "tsc --project tests/tsconfig.json",
 		"test:variants": "node --import tsx --test tests/variants/*.test.ts",
 		"build": "npm run build:shared && npm run build:fix-esm && npm run build:client && npm run build:server && npm run build:alias",

@@ -29,7 +29,6 @@ import { showError, showMenuScreen } from "./menu-ui";
 import {
     clearLastMoves,
     rememberLastMove,
-    suppressMoveAnimation,
 } from "./chess-ui";
 import {
     areClientClocksEnabled,
@@ -221,7 +220,6 @@ export function initGameSocket(): void {
                     gs.room.game.getMoveRules(),
                 )
             ) {
-                suppressMoveAnimation(boardID, currentMatch.queued.moves[0]);
                 gs.socket.emit(
                     "move-board",
                     boardID,
