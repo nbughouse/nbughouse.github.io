@@ -93,6 +93,8 @@ export class BotScheduler {
             botFen(room.game.matches[action.board].chess) !== action.fen) return;
         const move = action.legal.get(best);
         if (!move) throw new Error("The bot engine returned an unsupported move.");
-        action.plan.move = move;
+        action.plan.move = room.game.config.pocketShare === "none" && room.game.getCapturedPiece(action.board, move)
+            ? { ...move, captureRecipient: room.game.getCaptureRecipientBoards(action.board)[0] }
+            : move;
     }
 }

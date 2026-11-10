@@ -31,7 +31,7 @@ export function configureBotRoom(room: Room, options: BotOptions, host: Player):
     room.botLevel = options.level;
     room.botSpeed = options.speed ?? 5;
     room.addPlayer(host);
-    room.updateConfig({ matchNum: options.boards, timeBase: options.timeBase ?? 180, playerAssignment: "manual", pocketShare: "color" });
+    room.updateConfig({ matchNum: options.boards, timeBase: options.timeBase ?? 180, playerAssignment: "manual", pocketShare: "none" });
     room.game.matches[0].setPlayer(host, Color.WHITE);
     fillBotSeats(room);
 }
@@ -51,6 +51,28 @@ export function assignBotRoomHuman(room: Room, playerID: string, boardID: number
     room.game.matches[boardID].setPlayer(player, color);
     fillBotSeats(room);
     return true;
+}
+
+/** Replace solo/manual seats with a balanced random split when a human joins. */
+export function randomizeBotRoomHumans(room: Room, random: () => number = Math.random): void {
+    if (room.kind !== "bot" || room.status !== RoomStatus.LOBBY) return;
+    const humans = [...room.players.values()].filter(player =>
+        !player.isBot && player.status === PlayerStatus.CONNECTED);
+    for (let index = humans.length - 1; index > 0; index--) {
+        const target = Math.floor(random() * (index + 1));
+        [humans[index], humans[target]] = [humans[target], humans[index]];
+    }
+    const seatedHumans = humans.slice(0, room.game.matches.length);
+    let board = 0;
+    for (const [index, player] of seatedHumans.entries()) {
+        const count = Math.floor(room.game.matches.length / seatedHumans.length) +
+            (index < room.game.matches.length % seatedHumans.length ? 1 : 0);
+        for (let offset = 0; offset < count; offset++) {
+            const match = room.game.matches[board++];
+            match.setPlayer(player, match.getTeam(Color.WHITE) === Team.RED ? Color.WHITE : Color.BLACK);
+        }
+    }
+    fillBotSeats(room);
 }
 
 /** Preserve human assignments and share uncovered boards between humans. */

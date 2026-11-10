@@ -220,6 +220,7 @@ function updateUIPlayerSlot(
         Boolean(
             player &&
                 player.id === gs.player.id &&
+                gs.room.kind !== "bot" &&
                 gs.room.status === RoomStatus.LOBBY,
         ),
     );
@@ -261,20 +262,8 @@ function updateUIPlayerSlot(
         };
     }
 
-    if (gs.room.kind === "bot" && humanSeat && player?.id !== gs.player.id && gs.room.status === RoomStatus.LOBBY) {
-        playerInfo.onclick = () => gs.game.send("join-board", boardID, color);
-        playerInfo.setAttribute("role", "button");
-        playerInfo.setAttribute("tabindex", "0");
-        playerInfo.setAttribute("aria-label", `Take human seat on board ${boardID + 1} as ${color === Color.WHITE ? "white" : "black"}`);
-        playerInfo.onkeydown = event => {
-            if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                playerInfo.click();
-            }
-        };
-    }
-
     if (
+        gs.room.kind !== "bot" &&
         player?.id === gs.player.id &&
         gs.room.status === RoomStatus.LOBBY
     ) {

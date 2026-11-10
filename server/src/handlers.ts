@@ -14,7 +14,7 @@ import { io, profiles, rooms } from "./state";
 import { recordCompletedGame } from "./stats-store";
 import { saveProfiles } from "./profile-store";
 import { trackRoomPresence } from "./room-cleanup";
-import { assignBotRoomHuman, configureBotRoom, fillBotSeats, submitBotRoomMove, updateBotRoomSettings, validBotOptions } from "@shared/bots";
+import { assignBotRoomHuman, configureBotRoom, fillBotSeats, randomizeBotRoomHumans, submitBotRoomMove, updateBotRoomSettings, validBotOptions } from "@shared/bots";
 
 export function setupHandlers(socket: GameSocket): void {
     socket.on("ping", () => {
@@ -731,7 +731,10 @@ function joinRoom(socket: GameSocket, code: string): void {
         playerInRoom.name = socket.player.name;
         playerInRoom.status = PlayerStatus.CONNECTED;
         if (!room.hostID) room.reassignHost();
+        randomizeBotRoomHumans(room);
         socket.emit("joined-room", room.serialize());
+        if (room.kind === "bot" && room.status === RoomStatus.LOBBY)
+            socket.to(room.code).emit("joined-room", room.serialize());
         socket
             .to(room.code)
             .emit("p-set-name", socket.player.id, socket.player.name);
@@ -751,12 +754,15 @@ function joinRoom(socket: GameSocket, code: string): void {
             PlayerStatus.CONNECTED,
         );
         room.addPlayer(roomPlayer);
+        randomizeBotRoomHumans(room);
         io.to(room.code).emit(
             "p-joined-room",
             socket.player.id,
             socket.player.name,
         );
         socket.emit("joined-room", room.serialize());
+        if (room.kind === "bot" && room.status === RoomStatus.LOBBY)
+            socket.to(room.code).emit("joined-room", room.serialize());
         emitRoomServerChat(
             room,
             `${getPlayerDisplayName(roomPlayer)} joined the room.`,

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { botMoveDelay, botWaitBudget, botWaitReason } from "../../shared/src/bot-timing";
-import { configureBotRoom, updateBotRoomSettings, validBotOptions } from "../../shared/src/bots";
+import { configureBotRoom, submitBotRoomMove, updateBotRoomSettings, validBotOptions } from "../../shared/src/bots";
 import { Chess, Color, PieceType, type Move } from "../../shared/src/chess";
 import { Player } from "../../shared/src/player";
 import { Room, RoomStatus } from "../../shared/src/room";
@@ -99,6 +99,28 @@ test("independent turns keep elapsed time through other board moves and pocket c
     scheduler.clear();
     scheduler.accept(r, refresh, "e2e4");
     assert.equal(scheduler.next(r, 4000).kind, "search");
+});
+
+test("middle-board bot captures select one recipient and pass move validation", () => {
+    const r = room();
+    const chess = empty();
+    chess.board[7][4] = { type: PieceType.KING, color: Color.WHITE };
+    chess.board[0][4] = { type: PieceType.KING, color: Color.BLACK };
+    chess.board[4][0] = { type: PieceType.ROOK, color: Color.WHITE };
+    chess.board[4][3] = { type: PieceType.KNIGHT, color: Color.BLACK };
+    r.game.matches[1].chess = chess;
+    r.game.matches[2].whitePlayer!.isBot = false;
+    const scheduler = new BotScheduler(() => 0.5);
+    const search = scheduler.next(r, 1000);
+    assert.equal(search.kind, "search"); if (search.kind !== "search") return;
+    assert.equal(search.board, 1);
+    scheduler.accept(r, search, "a4d4");
+    const action = scheduler.next(r, 4000);
+    assert.equal(action.kind, "move"); if (action.kind !== "move") return;
+    assert.equal(action.move.captureRecipient, 0);
+    assert.ok(submitBotRoomMove(r, "host", action.board, Color.WHITE, action.move, 4000, r.revision)?.moved);
+    assert.equal(r.game.matches[0].chess.blackPocket.get(PieceType.KNIGHT), 1);
+    assert.equal(r.game.matches[2].chess.whitePocket.get(PieceType.KNIGHT) ?? 0, 0);
 });
 
 test("waiting requires a visible incoming mating piece and leaves real pockets untouched", () => {

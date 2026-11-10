@@ -46,7 +46,7 @@ export interface BotWaitReason {
 
 /** Conservative team coordination, based only on visible legal captures and mate. */
 export function botWaitReason(room: Room, board: number, move: Move): BotWaitReason | undefined {
-    if (room.game.config.pocketShare !== "color") return;
+    if (room.game.config.pocketShare === "shared") return;
     const match = room.game.matches[board];
     const color = match.chess.turn;
     const team = match.getTeam(color);
@@ -67,6 +67,8 @@ export function botWaitReason(room: Room, board: number, move: Move): BotWaitRea
     }
     for (const [index, partner] of room.game.matches.entries()) {
         if (index === board) continue;
+        if (room.game.config.pocketShare === "none" &&
+            !room.game.getCaptureRecipientBoards(board).includes(index)) continue;
         const ally = partner.getTeam(Color.WHITE) === team ? Color.WHITE : Color.BLACK;
         // Only an opponent already on move can use an immediate supplied drop.
         if (partner.chess.turn === invertColor(ally)) {

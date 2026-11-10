@@ -183,7 +183,7 @@ function setupBotView(): void {
                 return;
             }
             sn.game.closeLocal();
-            stopBotEngine();
+            stopBotEngine({ keepLoaded: true });
             sn.game.publish("joined-room", onlineRoom);
         } finally {
             button.disabled = false;

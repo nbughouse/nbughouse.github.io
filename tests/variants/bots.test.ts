@@ -17,6 +17,7 @@ for (const boards of [2, 3] as const) {
         const copy = Room.deserialize(room.serialize());
         assert.equal(copy.kind, "bot");
         assert.equal(copy.botLevel, 9);
+        assert.equal(copy.game.config.pocketShare, "none");
         assert.equal([...copy.players.values()].filter(player => player.isBot).length, boards);
         for (const match of copy.game.matches) {
             assert.equal(match.getPlayerTeam(Team.RED)?.id, "host");
@@ -93,7 +94,7 @@ test("FEN includes real pockets, promotion markers, en passant and castling righ
     assert.equal(botLegalMoves(new Chess(), {}).size, 20);
 });
 
-test("captures and shared drops invalidate every board's bot search revision", () => {
+test("bot captures go to one teammate and drops use only that board's pocket", () => {
     const room = new Room("BOTS", "host");
     configureBotRoom(room, { boards: 3, level: 5 }, new Player("host"));
     room.tryStartRoom(1000);
@@ -106,10 +107,15 @@ test("captures and shared drops invalidate every board's bot search revision", (
     };
     play(0, "e2e4"); play(0, "d7d5"); play(0, "e4d5");
     assert.equal(room.game.matches[1].chess.blackPocket.get(PieceType.PAWN), 1);
+    assert.equal(room.game.matches[0].chess.whitePocket.get(PieceType.PAWN) ?? 0, 0);
+    assert.equal(room.game.matches[2].chess.whitePocket.get(PieceType.PAWN) ?? 0, 0);
+    room.game.matches[2].chess.whitePocket.set(PieceType.PAWN, 1);
+    play(1, "e2e4");
+    play(1, "P@e5");
+    assert.equal(room.game.matches[1].chess.blackPocket.get(PieceType.PAWN) ?? 0, 0);
     assert.equal(room.game.matches[2].chess.whitePocket.get(PieceType.PAWN), 1);
     play(2, "P@e4");
-    assert.equal(room.game.matches[1].chess.blackPocket.get(PieceType.PAWN) ?? 0, 0);
-    assert.equal(room.revision, 4);
+    assert.equal(room.revision, 6);
 });
 
 test("nine presets and untrusted setup/move inputs are bounded", () => {

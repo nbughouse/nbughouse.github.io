@@ -42,13 +42,16 @@ export async function prepareBotEngine(): Promise<void> {
     }
 }
 
-export function stopBotEngine(): void {
+export function stopBotEngine({ keepLoaded = false }: { keepLoaded?: boolean } = {}): void {
     generation++;
     clearTimeout(wake);
     wake = undefined;
     scheduler.clear();
-    engine?.dispose();
-    engine = undefined;
+    if (keepLoaded) engine?.stopSearch();
+    else {
+        engine?.dispose();
+        engine = undefined;
+    }
     pendingMove = undefined;
     status("");
 }
@@ -83,7 +86,6 @@ async function runBots(): Promise<void> {
     requested = false;
     const token = generation;
     try {
-        status("Loading bots…");
         await prepareBotEngine();
         if (token !== generation || !ownsEngine()) return;
         status("");

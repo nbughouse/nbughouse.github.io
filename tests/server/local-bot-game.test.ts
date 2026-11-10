@@ -30,6 +30,7 @@ test("solo setup, moves, bot confirmations and resignation work without any sock
     openLocalBotGame(session, { boards: 3, level: 5 });
     t.after(() => connection.closeLocal());
     assert.equal(replica.kind, "bot");
+    assert.equal(replica.game.config.pocketShare, "none");
     connection.send("update-bot-settings", { matchNum: 2, timeBase: 300, initialBoard: "duck" }, 9, 2);
     await Promise.resolve();
     assert.equal(replica.game.matches.length, 2);

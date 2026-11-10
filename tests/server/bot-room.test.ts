@@ -3,7 +3,7 @@ import test from "node:test";
 import { Color } from "../../shared/src/chess";
 import { configureBotRoom } from "../../shared/src/bots";
 import { Player, PlayerStatus } from "../../shared/src/player";
-import { Room, RoomStatus } from "../../shared/src/room";
+import { Room, RoomStatus, Team } from "../../shared/src/room";
 import { setupHandlers } from "../../server/src/handlers";
 import { type GameSocket, io, rooms } from "../../server/src/state";
 import { removeEmptyRooms, trackRoomPresence } from "../../server/src/room-cleanup";
@@ -103,11 +103,49 @@ test("create-bot-room validates setup and returns a distinct bot room", t => {
     const room = c.socket.room!;
     t.after(() => rooms.delete(room.code));
     assert.equal(room.kind, "bot");
+    assert.equal(room.game.config.pocketShare, "none");
     assert.equal(room.botLevel, 9);
     assert.equal(acknowledged?.game.config.timeBase, 300);
     assert.equal(room.players.size, 3);
     assert.equal(c.received.find(entry => entry.event === "joined-room")?.args[0].kind, "bot");
 });
+
+for (const boards of [2, 3] as const) {
+    test(`${boards}-board friends rooms automatically replace solo seats on join`, t => {
+        t.mock.method(io, "to", () => ({ emit: () => {} }));
+        t.mock.method(Math, "random", () => 0);
+        const host = new Player("host", "Host");
+        const friend = new Player("friend", "Friend");
+        const room = new Room("AUTO", host.id);
+        configureBotRoom(room, { boards, level: 5 }, host);
+        rooms.set(room.code, room);
+        t.after(() => rooms.delete(room.code));
+        const c = connection(new Room("OLD", friend.id), friend);
+        c.socket.room = undefined;
+        c.trigger("join-room", room.code);
+        const counts = new Map<string, number>();
+        for (const match of room.game.matches) {
+            const human = match.getPlayerTeam(Team.RED)!;
+            assert.equal(human.isBot, false);
+            assert.equal(match.getPlayerTeam(Team.BLUE)?.isBot, true);
+            counts.set(human.id, (counts.get(human.id) ?? 0) + 1);
+        }
+        assert.equal(counts.size, 2);
+        assert.ok(Math.abs(counts.get(host.id)! - counts.get(friend.id)!) <= 1);
+        assert.equal(room.game.matches[0].getPlayerTeam(Team.RED)?.id, friend.id);
+        const snapshots = c.received.filter(message => message.event === "joined-room");
+        assert.equal(snapshots.length, 2); // New player and existing room members.
+        for (const snapshot of snapshots)
+            assert.equal(Room.deserialize(snapshot.args[0]).game.matches[0].getPlayerTeam(Team.RED)?.id, friend.id);
+        assert.equal(room.tryStartRoom(1000), true);
+        const seats = room.game.matches.map(match => match.getPlayerTeam(Team.RED)?.id);
+        const late = new Player("late", "Late");
+        const lateConnection = connection(new Room("OTHER", late.id), late);
+        lateConnection.socket.room = undefined;
+        lateConnection.trigger("join-room", room.code);
+        assert.deepEqual(room.game.matches.map(match => match.getPlayerTeam(Team.RED)?.id), seats);
+    });
+}
 
 test("bot-only rooms expire after their last human disconnects", () => {
     const host = new Player("host");
