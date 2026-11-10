@@ -91,6 +91,12 @@
    justify-content: flex-start;
 }
 
+#bot-engine-status {
+   padding: 8px 12px;
+   font-size: 13px;
+   line-height: 1.4;
+}
+
 .menu-view {
    width: 100%;
    animation: menu-view-fade-in 180ms ease-out;
@@ -263,6 +269,10 @@
 #join-game-btn,
 .secondary-action {
    --button-color: var(--red);
+}
+
+#play-bot-btn {
+   --button-color: var(--blue);
 }
 
 .form-group {

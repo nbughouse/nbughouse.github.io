@@ -8,12 +8,13 @@ import {
     Player,
     PlayerStatus,
 } from "@shared/player";
-import { Room, RoomStatus, Team } from "@shared/room";
-import type { GameSocket } from "./index";
-import { io, profiles, rooms } from "./index";
+import { Room, RoomStatus, Team, type SerializedRoom } from "@shared/room";
+import type { GameSocket } from "./state";
+import { io, profiles, rooms } from "./state";
 import { recordCompletedGame } from "./stats-store";
 import { saveProfiles } from "./profile-store";
 import { trackRoomPresence } from "./room-cleanup";
+import { assignBotRoomHuman, configureBotRoom, fillBotSeats, submitBotRoomMove, updateBotRoomSettings, validBotOptions } from "@shared/bots";
 
 export function setupHandlers(socket: GameSocket): void {
     socket.on("ping", () => {
@@ -78,6 +79,16 @@ export function setupHandlers(socket: GameSocket): void {
         joinRoom(socket, code);
     });
 
+    socket.on("create-bot-room", (options: unknown, reply?: (room?: SerializedRoom) => void) => {
+        const respond = (room?: Room) => { if (typeof reply === "function") reply(room?.serialize()); };
+        if (!validBotOptions(options)) { respond(); return; }
+        const code = createRoom(undefined, socket.player.id);
+        if (!code) { socket.emit("error", "Room limit reached"); respond(); return; }
+        configureBotRoom(rooms.get(code)!, options, new Player(socket.player.id, socket.player.name));
+        joinRoom(socket, code);
+        respond(socket.room?.code === code ? socket.room : undefined);
+    });
+
     socket.on("join-room", (code: string) => {
         joinRoom(socket, code.toUpperCase());
     });
@@ -95,6 +106,9 @@ export function setupHandlers(socket: GameSocket): void {
         if (socket.room.hostID !== socket.player.id) return;
 
         const currentTime = Date.now();
+        fillBotSeats(socket.room);
+        if (socket.room.kind === "bot")
+            io.to(socket.room.code).emit("joined-room", socket.room.serialize());
         if (socket.room.tryStartRoom(currentTime)) {
             io.to(socket.room.code).emit(
                 "started-room",
@@ -107,6 +121,7 @@ export function setupHandlers(socket: GameSocket): void {
 
     socket.on("update-room-settings", (settings: Partial<GameConfig>) => {
         if (!socket.room || socket.room.status !== RoomStatus.LOBBY) return;
+        if (socket.room.kind === "bot") return;
         if (socket.room.hostID !== socket.player.id) return;
 
         if (!socket.room.updateConfig(settings)) return;
@@ -116,6 +131,13 @@ export function setupHandlers(socket: GameSocket): void {
             socket.room.game.serialize(),
         );
         io.to(socket.room.code).emit("room-host-updated", socket.room.hostID);
+    });
+
+    socket.on("update-bot-settings", (settings: Partial<GameConfig>, level: number, speed?: number) => {
+        const room = socket.room;
+        if (!room || room.hostID !== socket.player.id) return;
+        if (updateBotRoomSettings(room, settings, level, speed))
+            io.to(room.code).emit("bot-room-updated", room.serialize());
     });
 
     socket.on("send-chat", (message: string) => {
@@ -176,8 +198,15 @@ export function setupHandlers(socket: GameSocket): void {
 
     socket.on("join-board", (boardID: number, color: Color) => {
         if (!socket.room || socket.room.status !== RoomStatus.LOBBY) return;
+        if (!Number.isInteger(boardID) || (color !== Color.WHITE && color !== Color.BLACK)) return;
 
         const board = socket.room.game.matches[boardID];
+        if (!board) return;
+        if (socket.room.kind === "bot") {
+            if (assignBotRoomHuman(socket.room, socket.player.id, boardID, color))
+                io.to(socket.room.code).emit("joined-room", socket.room.serialize());
+            return;
+        }
         const oppTeam =
             board.getTeam(color) === Team.RED ? Team.BLUE : Team.RED;
 
@@ -222,6 +251,12 @@ export function setupHandlers(socket: GameSocket): void {
             )
                 return;
 
+            if (room.kind === "bot") {
+                if (assignBotRoomHuman(room, playerID, boardID, color))
+                    io.to(room.code).emit("joined-room", room.serialize());
+                return;
+            }
+
             const board = room.game.matches[boardID];
             const player = room.getPlayer(playerID);
             if (!board || !player || player.status === PlayerStatus.DISCONNECTED)
@@ -247,6 +282,10 @@ export function setupHandlers(socket: GameSocket): void {
 
     socket.on("move-board", (boardID: number, color: Color, move: Move) => {
         if (!socket.room || socket.room.status !== RoomStatus.PLAYING) return;
+        if (socket.room.kind === "bot") {
+            handleBotRoomMove(socket, boardID, color, move);
+            return;
+        }
 
         const board = socket.room.game.matches[boardID];
         if (!board || (color !== Color.WHITE && color !== Color.BLACK)) return;
@@ -338,13 +377,34 @@ export function setupHandlers(socket: GameSocket): void {
         }
     });
 
+    socket.on("bot-move", (boardID: number, color: Color, move: Move, revision: number) => {
+        if (!Number.isInteger(revision)) return;
+        handleBotRoomMove(socket, boardID, color, move, revision);
+    });
+
+    socket.on("bot-engine-error", () => {
+        const room = socket.room;
+        if (!room || room.kind !== "bot" || room.hostID !== socket.player.id) return;
+        if (room.status === RoomStatus.PLAYING) {
+            const now = Date.now();
+            room.game.updateTime(now);
+            room.endRoom();
+            io.to(room.code).emit("ended-room", undefined, "Host bot engine stopped. Return home and try again.", now);
+        }
+    });
+
     socket.on("leave-board", (boardID: number, color: Color) => {
         if (!socket.room || socket.room.status !== RoomStatus.LOBBY) return;
 
         const board = socket.room.game.matches[boardID];
-        if (board.getPlayer(color)?.id !== socket.player.id) return;
+        if (board?.getPlayer(color)?.id !== socket.player.id) return;
 
         board.removePlayer(color);
+        if (socket.room.kind === "bot") {
+            fillBotSeats(socket.room);
+            io.to(socket.room.code).emit("joined-room", socket.room.serialize());
+            return;
+        }
         io.to(socket.room.code).emit("p-left-board", boardID, color);
         emitRoomServerChat(
             socket.room,
@@ -391,6 +451,7 @@ export function setupHandlers(socket: GameSocket): void {
         player.status = PlayerStatus.SPECTATING;
 
         socket.room.removePlayerFromBoards(socket.player.id);
+        fillBotSeats(socket.room);
 
         for (const { boardID, color } of vacatedSeats)
             io.to(socket.room.code).emit("p-left-board", boardID, color);
@@ -400,6 +461,7 @@ export function setupHandlers(socket: GameSocket): void {
             socket.player.id,
             PlayerStatus.SPECTATING,
         );
+        if (socket.room.kind === "bot") io.to(socket.room.code).emit("joined-room", socket.room.serialize());
     });
 
     socket.on("resign-room", () => {
@@ -425,6 +487,24 @@ export function setupHandlers(socket: GameSocket): void {
             socket.room.hostID,
         );
     });
+}
+
+function handleBotRoomMove(socket: GameSocket, boardID: number, color: Color, move: Move, revision?: number): void {
+    const room = socket.room;
+    if (!room || room.kind !== "bot") return;
+    const now = Date.now();
+    const result = submitBotRoomMove(room, socket.player.id, boardID, color, move, now, revision);
+    if (!result) {
+        if (room.hostID === socket.player.id || revision === undefined)
+            socket.emit("joined-room", room.serialize());
+        return;
+    }
+    if (result.moved) io.to(room.code).emit("p-moved-board", boardID, move, now);
+    if (result.end) {
+        room.endRoom(result.end.winner);
+        io.to(room.code).emit("ended-room", result.end.winner, result.end.reason, now);
+        io.to(room.code).emit("room-host-updated", room.hostID);
+    }
 }
 
 function getPlayerTeam(socket: GameSocket): Team | undefined {
@@ -643,12 +723,14 @@ function joinRoom(socket: GameSocket, code: string): void {
 
     socket.join(code);
     socket.room = room;
+    const previousHostID = room.hostID;
 
     if (playerInRoom) {
         const wasDisconnected =
             playerInRoom.status === PlayerStatus.DISCONNECTED;
         playerInRoom.name = socket.player.name;
         playerInRoom.status = PlayerStatus.CONNECTED;
+        if (!room.hostID) room.reassignHost();
         socket.emit("joined-room", room.serialize());
         socket
             .to(room.code)
@@ -680,6 +762,8 @@ function joinRoom(socket: GameSocket, code: string): void {
             `${getPlayerDisplayName(roomPlayer)} joined the room.`,
         );
     }
+    if (previousHostID !== room.hostID)
+        io.to(room.code).emit("room-host-updated", room.hostID);
     trackRoomPresence(room);
 }
 
@@ -724,7 +808,8 @@ function handleLobbyPlayerLeave(
         : getPlayerDisplayName(socket.player);
     const previousHostID = room.hostID;
 
-    room.removePlayer(socket.player.id, intentionalLeave);
+    room.removePlayer(socket.player.id);
+    fillBotSeats(room);
     socket.to(room.code).emit("p-left-room", socket.player.id);
 
     for (const { boardID, color } of vacatedSeats)
@@ -736,6 +821,7 @@ function handleLobbyPlayerLeave(
         `${playerName} ${intentionalLeave ? "left the room" : "disconnected"}.`,
     );
     if (previousHostID !== room.hostID) emitHostUpdateMessage(room);
+    if (room.kind === "bot") io.to(room.code).emit("joined-room", room.serialize());
 }
 
 function handleGamePlayerDisconnect(
@@ -748,15 +834,6 @@ function handleGamePlayerDisconnect(
     const previousHostID = room.hostID;
 
     if (getPlayerSeats(room, socket.player.id).length === 0) {
-        if (!intentionalLeave && room.hostID === socket.player.id) {
-            markPlayerDisconnected(socket, room);
-            emitRoomServerChat(
-                room,
-                `${getPlayerDisplayName(player)} disconnected.`,
-            );
-            return;
-        }
-
         room.removePlayer(socket.player.id);
         socket.to(room.code).emit("p-left-room", socket.player.id);
         socket.to(room.code).emit("room-host-updated", room.hostID);
@@ -780,7 +857,7 @@ function handleGamePlayerDisconnect(
         }.`,
     );
 
-    if (intentionalLeave && room.hostID === socket.player.id) {
+    if (room.hostID === socket.player.id) {
         room.reassignHost();
         socket.to(room.code).emit("room-host-updated", room.hostID);
         if (previousHostID !== room.hostID) emitHostUpdateMessage(room);

@@ -53,6 +53,10 @@ export default defineConfig({
 	},
 
 	server: {
+		headers: {
+			"Cross-Origin-Opener-Policy": "same-origin",
+			"Cross-Origin-Embedder-Policy": "require-corp",
+		},
 		host: "0.0.0.0",
 		port: config.clientPort,
 		allowedHosts: true,
@@ -72,6 +76,10 @@ export default defineConfig({
 		},
 	},
 	preview: {
+		headers: {
+			"Cross-Origin-Opener-Policy": "same-origin",
+			"Cross-Origin-Embedder-Policy": "require-corp",
+		},
 		host: "0.0.0.0",
 		port: config.clientPort,
 		strictPort: true,

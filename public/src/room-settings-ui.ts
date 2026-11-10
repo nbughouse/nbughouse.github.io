@@ -13,6 +13,14 @@ let roomSettingsSaveTimeout: number | undefined;
 const roomSettingsSaveDelay = 300;
 
 export function initRoomSettingsUI(): void {
+    const botLevelInput = document.querySelector<HTMLInputElement>("#setting-bot-level")!;
+    botLevelInput.addEventListener("input", queueRoomSettingsSave);
+    botLevelInput.addEventListener("change", flushRoomSettingsSave);
+    botLevelInput.addEventListener("blur", flushRoomSettingsSave);
+    const botSpeedInput = document.querySelector<HTMLInputElement>("#setting-bot-speed")!;
+    botSpeedInput.addEventListener("input", queueRoomSettingsSave);
+    botSpeedInput.addEventListener("change", flushRoomSettingsSave);
+    botSpeedInput.addEventListener("blur", flushRoomSettingsSave);
     const moreSettingsButton = document.querySelector("#more-room-settings-btn");
     const variantsButton = document.querySelector("#room-variants-btn");
     const variantButtons = document.querySelectorAll<HTMLButtonElement>(
@@ -277,6 +285,28 @@ export function updateRoomSettingsUI(): void {
     syncHoverPreviewSelect(pocketShareSelect);
 
     const editable = canEditRoomSettings();
+    const isBot = gs.room.kind === "bot";
+    const botLevelInput = document.querySelector<HTMLInputElement>("#setting-bot-level")!;
+    document.querySelector("#bot-level-field")?.classList.toggle("hidden", !isBot);
+    botLevelInput.value = String(gs.room.botLevel);
+    botLevelInput.disabled = !editable;
+    document.querySelector("#bot-speed-field")?.classList.toggle("hidden", !isBot);
+    const botSpeedInput = document.querySelector<HTMLInputElement>("#setting-bot-speed")!;
+    botSpeedInput.value = String(gs.room.botSpeed);
+    botSpeedInput.disabled = !editable;
+    const inviteButton = document.querySelector<HTMLButtonElement>("#invite-bot-friends-btn")!;
+    inviteButton.classList.toggle("hidden", !isBot || !gs.game.local);
+    inviteButton.disabled = !editable;
+    if (!isBot) document.querySelector<HTMLElement>("#bot-room-error")!.textContent = "";
+    matchInput.min = isBot ? "2" : "1";
+    matchInput.max = isBot ? "3" : "8";
+    timeSharedInput.closest("label")?.classList.toggle("hidden", isBot);
+    variantsButton.classList.toggle("hidden", isBot);
+    document.querySelector("#more-room-settings-btn")?.classList.toggle("hidden", isBot);
+    if (isBot) {
+        setMoreRoomSettingsOpen(false);
+        setRoomVariantsOpen(false);
+    }
     const clockSettingsLocked = isKungFuInitialBoard(
         gs.room.game.config.initialBoard,
     );
@@ -288,7 +318,7 @@ export function updateRoomSettingsUI(): void {
         pawnDropRanksInput,
         ...variantButtons,
     ])
-        element.disabled = !editable;
+        element.disabled = !editable || (isBot && element !== matchInput);
     variantsButton.disabled = false;
     for (const select of [
         timeTypeSelect,
@@ -297,12 +327,16 @@ export function updateRoomSettingsUI(): void {
         promotionTypeSelect,
         pocketShareSelect,
     ]) {
-        select.disabled = !editable;
+        select.disabled = !editable || isBot;
         select
             .nextElementSibling?.querySelector("button")
-            ?.toggleAttribute("disabled", !editable);
+            ?.toggleAttribute("disabled", !editable || isBot);
     }
     setClockSettingsDisabled(!editable || clockSettingsLocked);
+    if (isBot) {
+        setClockSettingsDisabled(true);
+        timeInput.disabled = !editable;
+    }
     note.textContent =
         gs.room.status !== RoomStatus.LOBBY
             ? "Settings are locked while a game is playing."
@@ -331,6 +365,24 @@ function flushRoomSettingsSave(): void {
 
 function saveRoomSettings(): void {
     if (!canEditRoomSettings()) return;
+
+    if (gs.room.kind === "bot") {
+        const levelInput = document.querySelector<HTMLInputElement>("#setting-bot-level")!;
+        const parsedLevel = levelInput.valueAsNumber;
+        const level = Number.isFinite(parsedLevel)
+            ? Math.max(1, Math.min(9, Math.round(parsedLevel)))
+            : gs.room.botLevel;
+        levelInput.value = String(level);
+        const boards = Number(document.querySelector<HTMLInputElement>("#setting-match-num")!.value);
+        const time = readNumberSetting(document.querySelector<HTMLInputElement>("#setting-time-base")!);
+        if ((boards !== 2 && boards !== 3) || time === undefined) return;
+        const speedInput = document.querySelector<HTMLInputElement>("#setting-bot-speed")!;
+        const speed = Number.isFinite(speedInput.valueAsNumber)
+            ? Math.max(1, Math.min(9, Math.round(speedInput.valueAsNumber))) : gs.room.botSpeed;
+        speedInput.value = String(speed);
+        gs.game.send("update-bot-settings", { matchNum: boards, timeBase: time }, level, speed);
+        return;
+    }
 
     const matchInput = document.querySelector(
         "#setting-match-num",
@@ -402,7 +454,7 @@ function saveRoomSettings(): void {
         pocketShare: pocketShareSelect.value as PocketShare,
     };
 
-    gs.socket.emit(
+    gs.game.send(
         "update-room-settings",
         clockSettingsLocked
             ? settings

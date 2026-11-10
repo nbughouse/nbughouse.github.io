@@ -3,14 +3,13 @@ import { setupHandlers } from "./handlers";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
-import { Server, Socket } from "socket.io";
+import { Socket } from "socket.io";
 import {
     config,
     isKungFuInitialBoard,
     kungFuGameLimitSeconds,
 } from "@shared/config";
 import { getPlayerDisplayName, Player, sanitizePlayerName } from "@shared/player";
-import type { Room } from "@shared/room";
 import { RoomStatus, Team } from "@shared/room";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,25 +18,18 @@ import {
     recordCompletedGame,
     recordPlayerSeen,
 } from "./stats-store";
-import { loadProfiles, saveProfiles, type Profile } from "./profile-store";
+import { saveProfiles, type Profile } from "./profile-store";
 import { removeEmptyRooms } from "./room-cleanup";
+import { GameSocket, io, profiles, rooms } from "./state";
 
 const app = express();
 const httpServer = http.createServer(app);
-export const io = new Server(httpServer, {
+io.attach(httpServer, {
     cors: {
         origin: isAllowedOrigin,
         credentials: true,
     },
 });
-export const rooms = new Map<string, Room>();
-export const profiles = loadProfiles();
-
-export class GameSocket extends Socket {
-    room: Room | undefined;
-    player!: Player;
-}
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../..");
 const devPublicPath = path.resolve(__dirname, "../../public");
@@ -48,6 +40,13 @@ const shouldUseDevClient =
     fs.existsSync(path.join(devPublicPath, "index.html"));
 const publicPath = hasBuiltClient ? prodPublicPath : devPublicPath;
 const sharedSrcPath = path.resolve(repoRoot, "shared/src");
+
+// The pinned Fairy-Stockfish WASM build uses shared memory inside its worker.
+app.use((_request, response, next) => {
+    response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    response.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+    next();
+});
 
 app.use("/api", (request, response, next) => {
     const origin = request.headers.origin;

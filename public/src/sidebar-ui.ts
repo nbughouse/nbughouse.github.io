@@ -18,6 +18,7 @@ import { gs } from "./session";
 
 let pingIntervalID: number;
 let pingStartTime = 0;
+let pingInitialized = false;
 
 export function initSidebarControls(): void {
     initSidebarTabs();
@@ -60,7 +61,7 @@ function initSidebarTabs(): void {
 // MARK: Resign Functionality
 
 function handleResign(): void {
-    gs.socket.emit("resign-room");
+    gs.game.send("resign-room");
 }
 
 function isPlayerInGame(): boolean {
@@ -81,10 +82,13 @@ function isPlayerInGame(): boolean {
 // MARK: Ping Indicator
 
 function initPingIndicator(): void {
-    gs.socket.on("pong", () => {
-        const pingTime = Date.now() - pingStartTime;
-        updatePingDisplay(pingTime);
-    });
+    if (!pingInitialized) {
+        pingInitialized = true;
+        gs.game.on("pong", () => {
+            const pingTime = Date.now() - pingStartTime;
+            updatePingDisplay(pingTime);
+        });
+    }
 
     startPingUpdates();
 }
@@ -100,8 +104,17 @@ function updatePingDisplay(ping: number): void {
 }
 
 function sendPing(): void {
+    if (gs.game.local) {
+        const indicator = document.querySelector<HTMLElement>("#ping-indicator");
+        if (indicator) {
+            indicator.title = "Local game · no network delay";
+            indicator.setAttribute("aria-label", indicator.title);
+            indicator.style.setProperty("--ping-color", "var(--green)");
+        }
+        return;
+    }
     pingStartTime = Date.now();
-    gs.socket.emit("ping");
+    gs.game.send("ping");
 }
 
 export function startPingUpdates(): void {
@@ -125,6 +138,8 @@ export function stopPingUpdates(): void {
 export function showSidebarRoomElements(): void {
     const gameRoomCode = document.querySelector("#game-room-code") as HTMLButtonElement;
     gameRoomCode.textContent = gs.room.code || "";
+    gameRoomCode.disabled = gs.game.local;
+    gameRoomCode.setAttribute("aria-label", gs.game.local ? "Local bot game" : "Copy room link");
 
     resetSidebarUI();
     updateRoomSettingsUI();
@@ -133,6 +148,7 @@ export function showSidebarRoomElements(): void {
 }
 
 function copyRoomLink(): void {
+    if (gs.game.local) return;
     if (!gs.room?.code) return;
 
     const roomURL = new URL(
@@ -192,16 +208,19 @@ export function updateStartButton(): void {
     const isSpectating =
         gs.room?.getPlayer(gs.player.id)?.status === PlayerStatus.SPECTATING;
     const playerCount = [...(gs.room?.players.values() ?? [])].filter(
-        (player) => player.status === PlayerStatus.CONNECTED,
+        (player) => !player.isBot && player.status === PlayerStatus.CONNECTED,
     ).length;
-    const isWaitingForPlayers = playerCount <= 1;
+    const isWaitingForPlayers = gs.room?.kind !== "bot" && playerCount <= 1;
+    const botNeedsHuman = gs.room?.kind === "bot" && !gs.room.game.matches.some(match =>
+        [match.whitePlayer, match.blackPlayer].some(player =>
+            player && !player.isBot && player.status === PlayerStatus.CONNECTED));
 
     if (isPlaying) {
         readyButton.textContent = "Waiting for next round...";
         readyButton.disabled = true;
         readyButton.classList.add("waiting");
-    } else if (isHost && isWaitingForPlayers) {
-        readyButton.textContent = "Waiting for people...";
+    } else if (isHost && (isWaitingForPlayers || botNeedsHuman)) {
+        readyButton.textContent = botNeedsHuman ? "Choose a computer seat" : "Waiting for people...";
         readyButton.disabled = true;
         readyButton.classList.add("waiting");
     } else if (isHost) {
@@ -215,6 +234,7 @@ export function updateStartButton(): void {
     }
 
     spectatorButton.hidden = !isLobby && !(isPlaying && !isCurrentPlayerPlaying);
+    if (gs.game.local) spectatorButton.hidden = true;
     const spectatorLabel = isPlaying
         ? isSpectating
             ? "Play next round"
@@ -258,7 +278,7 @@ export function updateUIPlayerList(): void {
             ),
         );
         playerList.innerHTML = "";
-        const playersByScore = [...gs.room.players].sort(
+        const playersByScore = [...gs.room.players].filter(([, player]) => !player.isBot).sort(
             ([, playerA], [, playerB]) =>
                 comparePlayersByScore(playerA, playerB),
         );

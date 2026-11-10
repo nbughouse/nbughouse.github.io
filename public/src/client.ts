@@ -6,6 +6,7 @@ import { initSession } from "./session";
 import { initChatControls } from "./chat-ui";
 import { initSidebarControls } from "./sidebar-ui";
 import { checkURLForRoom } from "./url";
+import { initBotHost } from "./bot-host";
 
 document.addEventListener("DOMContentLoaded", () => {
     (function () {
@@ -13,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
         initMenuSocket();
         initMenuControls();
         initGameSocket();
+        initBotHost();
         initGameControls();
         initSidebarControls();
         initChatControls();

@@ -10,6 +10,7 @@ const PLAYER_NAME_ALLOWED_CHARACTERS = /[^A-Za-z0-9_]/g;
 const PLAYER_NAME_PATTERN = /^[A-Za-z0-9_]+$/;
 
 export class Player {
+    isBot = false;
     id: string;
     name: string;
     status: PlayerStatus;
@@ -32,7 +33,8 @@ export class Player {
     }
 }
 
-export function getPlayerDisplayName(player: Pick<Player, "name">): string {
+export function getPlayerDisplayName(player: Pick<Player, "name"> & Partial<Pick<Player, "isBot">>): string {
+    if (player.isBot) return player.name.replace(/^Bot_/, "Bot ");
     return player.name.trim() || GUEST_DISPLAY_NAME;
 }
 

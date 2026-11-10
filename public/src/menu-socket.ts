@@ -4,7 +4,9 @@ import { setStoredProfileValue, sn } from "./session";
 
 export function initMenuSocket(): void {
     sn.socket.on("created-player", (id: string, auth: string) => {
-        sn.player = new Player(id, sn.name);
+        const player = new Player(id, sn.name);
+        if (sn.game.local) sn.onlinePlayer = player;
+        else sn.player = player;
         sn.auth = auth;
         setStoredProfileValue("id", id);
         setStoredProfileValue("auth", auth);

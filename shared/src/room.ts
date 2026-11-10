@@ -47,6 +47,10 @@ export interface SerializedGame {
 }
 
 export interface SerializedRoom {
+    kind?: "human" | "bot";
+    botLevel?: number;
+    botSpeed?: number;
+    revision?: number;
     code: string;
     hostID: string | undefined;
     status: RoomStatus;
@@ -57,6 +61,10 @@ export interface SerializedRoom {
 }
 
 export class Room {
+    kind: "human" | "bot" = "human";
+    botLevel = 5;
+    botSpeed = 5;
+    revision = 0;
     code: string;
     hostID: string | undefined;
     players: Map<string, Player>;
@@ -84,6 +92,10 @@ export class Room {
             serializedPlayers[id] = player;
 
         return {
+            kind: this.kind,
+            botLevel: this.botLevel,
+            botSpeed: this.botSpeed,
+            revision: this.revision,
             code: this.code,
             hostID: this.hostID,
             status: this.status,
@@ -96,6 +108,10 @@ export class Room {
 
     static deserialize(data: SerializedRoom): Room {
         const room = new Room(data.code);
+        room.kind = data.kind ?? "human";
+        room.botLevel = data.botLevel ?? 5;
+        room.botSpeed = data.botSpeed ?? 5;
+        room.revision = data.revision ?? 0;
         room.hostID = data.hostID;
         room.status = data.status;
         room.chat = Chat.deserialize(data.chat);
@@ -108,6 +124,7 @@ export class Room {
                 playerData.status,
             );
             player.wins = playerData.wins;
+            player.isBot = playerData.isBot ?? false;
             player.total = playerData.total;
             room.players.set(id, player);
         }
@@ -154,7 +171,7 @@ export class Room {
 
     transferHost(id: string): boolean {
         const player = this.players.get(id);
-        if (!player || player.status === PlayerStatus.DISCONNECTED)
+        if (!player || player.isBot || player.status === PlayerStatus.DISCONNECTED)
             return false;
 
         this.hostID = id;
@@ -167,7 +184,7 @@ export class Room {
 
     private nextConnectedPlayerID(): string | undefined {
         for (const player of this.players.values())
-            if (player.status !== PlayerStatus.DISCONNECTED) return player.id;
+            if (!player.isBot && player.status !== PlayerStatus.DISCONNECTED) return player.id;
 
         return undefined;
     }
@@ -178,18 +195,25 @@ export class Room {
 
     tryStartRoom(currentTime: number = Date.now()): boolean {
         if (this.status !== RoomStatus.LOBBY) return false;
+        if (this.kind === "bot" && !this.game.matches.some(match =>
+            [match.whitePlayer, match.blackPlayer].some(player =>
+                player && !player.isBot && player.status === PlayerStatus.CONNECTED))) return false;
 
         const assignPlayers =
             this.game.config.playerAssignment === "random"
                 ? randomizeMatchPlayers
                 : fillEmptyMatchPlayers;
-        if (!assignPlayers(this.game.matches, this.connectedPlayers()))
+        if (this.kind !== "bot" && !assignPlayers(this.game.matches, this.connectedPlayers()))
             return false;
 
         for (const match of this.game.matches)
             if (!match.whitePlayer || !match.blackPlayer) return false;
+        if (this.kind === "bot" && this.game.matches.some(match =>
+            match.getPlayerTeam(Team.RED)?.isBot || !match.getPlayerTeam(Team.BLUE)?.isBot))
+            return false;
 
         this.status = RoomStatus.PLAYING;
+        this.revision = 0;
         this.startedAt = currentTime;
 
         for (const match of this.game.matches) {

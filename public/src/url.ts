@@ -4,6 +4,7 @@ import { sn } from "./session";
 import { getAppPathname, getBasePath, getRoomPath } from "./app-paths";
 
 export async function checkURLForRoom(): Promise<void> {
+    if (sn.game.local) return;
     const roomCode = getRoomCodeFromPath()?.toUpperCase();
 
     if (!roomCode) return;
@@ -15,6 +16,7 @@ export async function checkURLForRoom(): Promise<void> {
     }
 
     const exists = await roomExists(roomCode);
+    if (sn.game.local) return;
     if (exists === undefined) {
         showError("menu-error", "Cannot reach game server. Try again in a moment.");
         return;

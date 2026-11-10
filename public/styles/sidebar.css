@@ -1,4 +1,7 @@
 /* Game Sidebar */
+#bot-room-error:empty { display: none; }
+#bot-room-error { font-size: 13px; line-height: 1.4; }
+
 #game-sidebar {
    --sidebar-section-gap: 1.5vh;
    --sidebar-margin: var(--sidebar-section-gap);
@@ -172,6 +175,15 @@
    flex-direction: column;
    gap: 0.5vh;
    padding: var(--sidebar-section-gap) var(--sidebar-margin);
+}
+
+#invite-bot-friends-btn {
+   margin: 0 var(--sidebar-margin) var(--sidebar-section-gap);
+   width: calc(100% - 2 * var(--sidebar-margin));
+}
+
+#players-tab-panel #bot-room-error:not(:empty) {
+   margin: 0 var(--sidebar-margin) var(--sidebar-section-gap);
 }
 
 .player-item {

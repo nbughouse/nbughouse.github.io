@@ -210,7 +210,7 @@ export function sendChatMessage(): void {
 
     const message = sanitizeChatMessage(chatInput.value);
     if (message.length > 0) {
-        gs.socket.emit("send-chat", message);
+        gs.game.send("send-chat", message);
         chatInput.value = "";
     }
 }

@@ -1,4 +1,5 @@
 import { Color } from "@shared/chess";
+import { isHumanBotSeat } from "@shared/bots";
 import { isKungFuInitialBoard } from "@shared/config";
 import {
     getPlayerDisplayName,
@@ -207,10 +208,11 @@ function updateUIPlayerSlot(
     const playerInfo = document.querySelector(
         `#${side}-info-${boardID}`,
     ) as HTMLElement;
+    const humanSeat = gs.room.kind !== "bot" || isHumanBotSeat(gs.room, boardID, color);
 
     playerInfo.classList.toggle(
         "open-player-seat",
-        !player && gs.room.status === RoomStatus.LOBBY,
+        humanSeat && (!player || player.isBot) && gs.room.status === RoomStatus.LOBBY,
     );
     playerInfo.dataset.color = String(color);
     playerInfo.classList.toggle(
@@ -223,6 +225,7 @@ function updateUIPlayerSlot(
     );
 
     playerInfo.onclick = null;
+    playerInfo.removeAttribute("aria-label");
     playerInfo.onkeydown = null;
     playerInfo.removeAttribute("role");
     playerInfo.removeAttribute("tabindex");
@@ -237,7 +240,7 @@ function updateUIPlayerSlot(
 
     const canHostAssign =
         gs.room.hostID === gs.player.id &&
-        gs.room.status === RoomStatus.LOBBY;
+        gs.room.status === RoomStatus.LOBBY && humanSeat;
     if (canHostAssign && dropZone) {
         dropZone.ondragover = (event) => {
             if (!event.dataTransfer?.types.includes("application/x-player-id"))
@@ -254,7 +257,20 @@ function updateUIPlayerSlot(
                 "application/x-player-id",
             );
             if (playerID)
-                gs.socket.emit("assign-player-board", playerID, boardID, color);
+                gs.game.send("assign-player-board", playerID, boardID, color);
+        };
+    }
+
+    if (gs.room.kind === "bot" && humanSeat && player?.id !== gs.player.id && gs.room.status === RoomStatus.LOBBY) {
+        playerInfo.onclick = () => gs.game.send("join-board", boardID, color);
+        playerInfo.setAttribute("role", "button");
+        playerInfo.setAttribute("tabindex", "0");
+        playerInfo.setAttribute("aria-label", `Take human seat on board ${boardID + 1} as ${color === Color.WHITE ? "white" : "black"}`);
+        playerInfo.onkeydown = event => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                playerInfo.click();
+            }
         };
     }
 
@@ -263,12 +279,12 @@ function updateUIPlayerSlot(
         gs.room.status === RoomStatus.LOBBY
     ) {
         playerInfo.onclick = () => {
-            gs.socket.emit("leave-board", boardID, color);
+            gs.game.send("leave-board", boardID, color);
         };
         playerInfo.onkeydown = (event) => {
             if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                gs.socket.emit("leave-board", boardID, color);
+                gs.game.send("leave-board", boardID, color);
             }
         };
         playerInfo.setAttribute("role", "button");

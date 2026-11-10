@@ -4,8 +4,11 @@ import { config } from "@shared/config";
 import { Player } from "@shared/player";
 import type { Room } from "@shared/room";
 import { Settings } from "./settings";
+import { GameConnection } from "./game-connection";
 
 export class Session {
+    game: GameConnection;
+    onlinePlayer: Player | undefined;
     socket: Socket;
     room: Room | undefined;
     player: Player | undefined;
@@ -16,6 +19,7 @@ export class Session {
     constructor(id?: string, auth?: string) {
         const storedName = getStoredProfileValue("name");
         this.socket = io(getBackendUrl(), getSocketOptions(id, auth));
+        this.game = new GameConnection(this.socket);
 
         this.room = undefined;
         this.player = id ? new Player(id, storedName || "") : undefined;

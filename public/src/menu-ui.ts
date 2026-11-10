@@ -8,6 +8,9 @@ import { getBasePath } from "./app-paths";
 import { applyAllChessSettings, applyPieceAnimationSpeed } from "./chess-ui";
 import { fetchSiteStats, type SiteStats } from "./stats-api";
 import { initMenuBackground } from "./menu-background";
+import { openLocalBotGame } from "./local-bot-game";
+import { prepareBotEngine, stopBotEngine } from "./bot-host";
+import type { SerializedRoom } from "@shared/room";
 import {
     boardThemes,
     pieceThemes,
@@ -91,17 +94,12 @@ export function initMenuControls(): void {
 
     const readyButton = document.querySelector("#ready-btn");
     readyButton?.addEventListener("click", () => {
-        sn.socket.emit("start-room");
+        sn.game.send("start-room");
     });
 
     const spectatorButton = document.querySelector("#spectator-btn");
     spectatorButton?.addEventListener("click", () => {
-        sn.socket.emit("toggle-spectator");
-    });
-
-    const leaveRoomButton = document.querySelector("#leave-game-btn");
-    leaveRoomButton?.addEventListener("click", () => {
-        leaveRoom();
+        sn.game.send("toggle-spectator");
     });
 
     setupActionNameView();
@@ -109,6 +107,7 @@ export function initMenuControls(): void {
     setupHelpView();
     setupStatsView();
     setupSettingsView();
+    setupBotView();
 }
 
 function initMenuHistory(): void {
@@ -121,14 +120,73 @@ function initMenuHistory(): void {
         const state = event.state as BughouseHistoryState | null;
 
         if (state?.bughouseView === "menu") {
+            stopBotEngine();
+            if (sn.room) {
+                sn.game.send("leave-room");
+                showMenuScreen(false);
+            }
             showMenuView(state.menuView || "main", false);
             return;
         }
 
         const gameScreen = document.querySelector("#game");
         if (gameScreen && !gameScreen.classList.contains("hidden")) {
-            sn.socket.emit("leave-room");
+            sn.game.send("leave-room");
             showMenuScreen(false);
+        }
+    });
+}
+
+function setupBotView(): void {
+    document.querySelector("#play-bot-btn")?.addEventListener("click", async () => {
+        const button = document.querySelector<HTMLButtonElement>("#play-bot-btn")!;
+        if (button.disabled) return;
+        button.disabled = true;
+        button.textContent = "Loading bots…";
+        try {
+            await prepareBotEngine();
+            if (currentMenuView !== "main" || sn.room) { stopBotEngine(); return; }
+            openLocalBotGame(sn, { boards: 2, level: 5 });
+        } catch (error) {
+            showError("menu-error", error instanceof Error ? error.message : "Could not load the bot engine.");
+        } finally {
+            button.disabled = false;
+            button.textContent = "Create Bot Room";
+        }
+    });
+
+    document.querySelector("#invite-bot-friends-btn")?.addEventListener("click", async () => {
+        if (!sn.game.local || sn.room?.status !== "lobby") return;
+        const room = sn.room;
+        const button = document.querySelector<HTMLButtonElement>("#invite-bot-friends-btn")!;
+        const error = document.querySelector<HTMLElement>("#bot-room-error")!;
+        button.disabled = true;
+        error.textContent = "";
+        try {
+            if (!(await ensureServerReachable())) {
+                error.textContent = "Cannot reach the server. You can keep playing locally.";
+                return;
+            }
+            if (sn.room !== room || !sn.game.local || room.status !== "lobby") return;
+            const options = { boards: room.game.matches.length, level: room.botLevel, speed: room.botSpeed, timeBase: room.game.config.timeBase };
+            const onlineRoom = await new Promise<SerializedRoom | undefined>(resolve => {
+                sn.socket.timeout(5000).emit("create-bot-room", options,
+                    (error: Error | null, result?: SerializedRoom) => resolve(error ? undefined : result));
+            });
+            if (!onlineRoom) {
+                sn.socket.emit("leave-room");
+                error.textContent = "Could not create a shared room. Your local room is still available.";
+                return;
+            }
+            if (sn.room !== room || !sn.game.local || room.status !== "lobby") {
+                sn.socket.emit("leave-room");
+                return;
+            }
+            sn.game.closeLocal();
+            stopBotEngine();
+            sn.game.publish("joined-room", onlineRoom);
+        } finally {
+            button.disabled = false;
         }
     });
 }
@@ -925,7 +983,7 @@ function pingServer(timeoutMs: number): Promise<boolean> {
 
 export function leaveRoom(): void {
     globalThis.history.replaceState(createMenuHistoryState("main"), "", getBasePath());
-    sn.socket.emit("leave-room");
+    sn.game.send("leave-room");
     showMenuScreen();
 }
 
@@ -938,6 +996,8 @@ export function showScreen(screenId: string): void {
 }
 
 export function showMenuScreen(updateHistory = true): void {
+    stopBotEngine();
+    sn.game.closeLocal();
     showScreen("menu");
     showMainMenuView(updateHistory);
     clearErrors();

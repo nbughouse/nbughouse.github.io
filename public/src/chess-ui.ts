@@ -766,7 +766,7 @@ export function submitQueuedMove(id: number): void {
         if (match.queued.moves[0] === move &&
             match.chess.isLegal(move, false, game.getMoveRules()) &&
             game.canMove(id, move))
-            gs.socket.emit("move-board", id, match.chess.turn, move);
+            gs.game.send("move-board", id, match.chess.turn, move);
     };
     if (game.config.pocketShare === "none" &&
         move.captureRecipient === undefined &&
@@ -801,7 +801,7 @@ function executeMove(
     }
 
     const color = board.getPiece(move.from)?.color ?? selected?.piece.color ?? board.turn;
-    if (!premove) gs.socket.emit("move-board", id, color, move);
+    if (!premove) gs.game.send("move-board", id, color, move);
 
     gs.room.game.matches[id].queued.color = color;
     gs.room.game.matches[id].queued.moves.push(move);

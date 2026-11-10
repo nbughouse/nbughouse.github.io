@@ -32,6 +32,7 @@ export function recordPlayerSeen(playerID: string): void {
 }
 
 export function recordCompletedGame(room: Room): void {
+    if (room.kind === "bot") return;
     appendStatsEvent({
         type: "completed_game",
         roomCode: room.code,

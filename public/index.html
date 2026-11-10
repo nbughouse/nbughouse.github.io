@@ -5,11 +5,13 @@
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<meta http-equiv="Content-Security-Policy"
-		content="default-src 'self'; script-src 'self' https://cdn.socket.io; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss: http: https:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" />
+		content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.socket.io; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss: http: https:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" />
 	<title>Bughouse</title>
 	<style>
 		/* Keep inactive screens hidden before external styles finish loading. */
-		.hidden { display: none !important; }
+		.hidden {
+			display: none !important;
+		}
 	</style>
 	<link rel="stylesheet" href="/styles/base.css" />
 	<link rel="stylesheet" href="/styles/menu-background.css" />
@@ -41,6 +43,9 @@
 						<button id="create-game-btn" class="game-action-btn">
 							Create New Room
 						</button>
+						<button id="play-bot-btn" class="game-action-btn" type="button">
+							Create Bot Room
+						</button>
 						<button id="join-game-btn" class="game-action-btn secondary-action">
 							Join Room by ID
 						</button>
@@ -65,8 +70,8 @@
 						<div id="join-form">
 							<label class="join-field" for="join-room-code-input">
 								<span>Match ID</span>
-								<input type="text" id="join-room-code-input" placeholder="XXXX" maxlength="4" autocomplete="off"
-									required />
+								<input type="text" id="join-room-code-input" placeholder="XXXX" maxlength="4"
+									autocomplete="off" required />
 							</label>
 							<label class="join-field" for="join-player-name-input">
 								<input type="text" id="join-player-name-input" placeholder="Guest" maxlength="20"
@@ -80,8 +85,7 @@
 					</div>
 					<div id="name-section" class="menu-view hidden">
 						<div class="menu-view-topbar">
-							<button id="back-from-name-btn" type="button"
-								aria-label="Back"></button>
+							<button id="back-from-name-btn" type="button" aria-label="Back"></button>
 						</div>
 						<div id="name-form">
 							<label class="join-field" for="action-player-name-input">
@@ -96,8 +100,7 @@
 					</div>
 					<div id="help-section" class="menu-view hidden">
 						<div class="menu-view-topbar">
-							<button id="back-from-help-btn" type="button"
-								aria-label="Back"></button>
+							<button id="back-from-help-btn" type="button" aria-label="Back"></button>
 						</div>
 						<div id="help-content">
 							<section class="help-block">
@@ -140,8 +143,7 @@
 					</div>
 					<div id="stats-section" class="menu-view hidden">
 						<div class="menu-view-topbar">
-							<button id="back-from-stats-btn" type="button"
-								aria-label="Back"></button>
+							<button id="back-from-stats-btn" type="button" aria-label="Back"></button>
 						</div>
 						<div id="stats-content">
 							<section class="stats-hero">
@@ -192,8 +194,7 @@
 					</div>
 					<div id="menu-settings-section" class="menu-view hidden">
 						<div class="menu-view-topbar">
-							<button id="back-from-settings-btn" type="button"
-								aria-label="Back"></button>
+							<button id="back-from-settings-btn" type="button" aria-label="Back"></button>
 						</div>
 						<div class="menu-settings-form">
 							<label class="settings-field">
@@ -288,9 +289,22 @@
 			</div>
 			<div id="players-tab-panel" class="sidebar-tab-panel">
 				<div id="player-list"></div>
+				<button id="invite-bot-friends-btn" class="room-settings-more-btn hidden" type="button">Invite Friends
+					+</button>
+				<div id="bot-room-error" role="status" aria-live="polite"></div>
 			</div>
 			<div id="settings-tab-panel" class="sidebar-tab-panel hidden">
 				<div id="room-settings">
+					<label id="bot-speed-field" class="settings-field hidden">
+						<span>Speed Level</span>
+						<input type="number" id="setting-bot-speed" min="1" max="9" step="1" inputmode="numeric"
+							aria-label="Bot speed" />
+					</label>
+					<label id="bot-level-field" class="settings-field hidden">
+						<span>Bot level</span>
+						<input type="number" id="setting-bot-level" min="1" max="9" step="1" inputmode="numeric"
+							aria-label="Bot difficulty" />
+					</label>
 					<label class="settings-field">
 						<span>Boards</span>
 						<input type="number" id="setting-match-num" min="1" max="8" step="1" />
@@ -415,13 +429,15 @@
 		</div>
 		<div id="game-area-wrapper">
 			<div class="scroll-controls">
-				<button class="scroll-btn" id="scrollLeft" type="button" aria-label="Previous board"><span class="ui-icon ui-icon-arrow-left" aria-hidden="true"></span></button>
+				<button class="scroll-btn" id="scrollLeft" type="button" aria-label="Previous board"><span
+						class="ui-icon ui-icon-arrow-left" aria-hidden="true"></span></button>
 				<span class="scroll-indicator">Board <span id="boardRange">1</span> of
 					<span id="totalBoards">1</span></span>
 				<button id="grid-toggle-btn" class="control-btn">
 					Grid View
 				</button>
-				<button class="scroll-btn" id="scrollRight" type="button" aria-label="Next board"><span class="ui-icon ui-icon-arrow-right" aria-hidden="true"></span></button>
+				<button class="scroll-btn" id="scrollRight" type="button" aria-label="Next board"><span
+						class="ui-icon ui-icon-arrow-right" aria-hidden="true"></span></button>
 			</div>
 			<div id="game-area" class="hide-scrollbar"></div>
 		</div>

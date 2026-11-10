@@ -232,6 +232,69 @@ Sounds and chess assets are credited to [Lichess](https://lichess.org).
 
 ## Gameplay Flow
 
+### Create Bot Room
+
+The blue **Create Bot Room** home button opens the regular lobby directly.
+Humans play the red team against computers on the blue team. In solo play you
+control every human seat. The host can drag players from the player list onto
+human seats to share boards with friends; computer seats cannot be taken.
+Press Start when ready. The room's Settings tab offers 2 or 3 boards, difficulty 1–9, speed 1–9 (slow to fast), and clock
+time (3 minutes initially). Bot games use standard pieces and shared team
+pockets. Unsupported variants and advanced settings are hidden or disabled.
+
+The room starts as a local session without creating a server room. The browser
+owns moves, clocks, results and computer searches, so server latency and outages
+do not affect play after the assets load. Games are not persisted across reloads.
+
+**Invite friends** in the Players tab creates a distinct `bot` room with a shareable
+room link, carrying over board count, difficulty, speed and clock time. The
+server validates moves and owns clocks and results; only the host's browser runs
+the engine. Engine results include a room-wide revision so transfers and shared
+drops invalidate stale results. If the host leaves, host ownership and engine
+work move to another connected human. Backgrounding or slowing the host browser
+can slow bots. Bot games are excluded from public completed-game statistics.
+
+Fairy-Stockfish 1.1.12 is vendored under `public/assets/engine/fairy-stockfish`,
+including its GPL license, authors, exact source link and verified package
+integrity. A dedicated Web Worker runs one single-thread search at a time,
+rotating among boards with computer turns. NNUE downloads and pondering are
+disabled. Application rules manage team pocket transfers; three-board play uses
+per-board engine searches rather than a native three-board team search.
+
+Levels 1–9 map to engine Skill Level `-20, -15, -10, -5, 0, 5, 10, 15, 20`.
+Searches are bounded to 100 ms (250 ms at level 9). These are difficulty presets,
+not calibrated bughouse Elo ratings.
+
+Playing tempo is independent of difficulty. Each board has its own move deadline,
+derived from remaining time, starting time and speed, with modest variation.
+Forced moves are quicker, and clock pressure shortens deadlines. Pocket changes
+refresh the chosen move without restarting elapsed thinking time. Searches count
+toward thinking time; the browser uses one wake timer for all boards.
+
+Bots can briefly sit when a partner has a legal capture supplying a missing
+mating drop, or when their selected move allows a capture supplying an opponent’s
+mating drop. These checks use visible positions rather than predictions of human intent.
+Waits are reassessed on moves and bounded by a clock-derived deadline; at most
+one bot per team waits so partners can continue. Immediate mating moves proceed.
+The few pacing parameters live together in `shared/src/bot-timing.ts`.
+
+The WASM build needs a secure context and cross-origin isolation. Express,
+Vite development and Vite preview set these response headers:
+
+```text
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+Alternate static hosts must provide these headers too. GitHub Pages does not
+provide them by default; use the main host for bot play. The interface reports
+an engine setup error when shared memory is unavailable. No server-side engine
+or remote engine service is used.
+
+`npm test` includes local transport checks, server authority and host-transfer
+checks, and a finite smoke test of the actual vendored WASM at all nine levels.
+These tests do not start a server.
+
 1. Enter a player name.
 2. Create a room or join a room by code.
 3. Pick open board seats with the `[+]` buttons.

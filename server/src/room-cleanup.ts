@@ -6,7 +6,7 @@ const emptySince = new WeakMap<Room, number>();
 
 export function trackRoomPresence(room: Room, currentTime = Date.now()): void {
     const hasConnectedPlayers = [...room.players.values()].some(
-        (player) => player.status !== PlayerStatus.DISCONNECTED,
+        (player) => !player.isBot && player.status !== PlayerStatus.DISCONNECTED,
     );
 
     if (hasConnectedPlayers) emptySince.delete(room);

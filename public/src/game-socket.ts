@@ -47,7 +47,7 @@ import { playSound } from "./sound-ui";
 import { updateURL } from "./url";
 
 export function initGameSocket(): void {
-    gs.socket.on("joined-room", (raw: SerializedRoom) => {
+    gs.game.on("joined-room", (raw: SerializedRoom) => {
         const room = Room.deserialize(raw);
 
         gs.room = room;
@@ -68,34 +68,47 @@ export function initGameSocket(): void {
             stopTimeUpdates();
         }
 
-        updateURL(room.code);
+        if (!gs.game.local) updateURL(room.code);
+        else if (globalThis.history.state?.bughouseView !== "game")
+            globalThis.history.pushState({ bughouseView: "game" }, "", globalThis.location.pathname);
     });
 
-    gs.socket.on("room-host-updated", (hostID: string | undefined) => {
+    gs.game.on("bot-room-updated", (raw: SerializedRoom) => {
+        gs.room = Room.deserialize(raw);
+        rebuildRoomBoardElements();
+        updateRoomSettingsUI();
+        updateUIPlayerList();
+        updateUIAllPlayers();
+        updateUIAllBoards();
+        updateUITime();
+        refreshDualBoardLayout();
+    });
+
+    gs.game.on("room-host-updated", (hostID: string | undefined) => {
         gs.room.hostID = hostID;
         updateUIPlayerList();
         updateRoomSettingsUI();
         updateStartButton();
     });
 
-    gs.socket.on("banned-from-room", (roomCode: string) => {
+    gs.game.on("banned-from-room", (roomCode: string) => {
         showMenuScreen();
         showError("menu-error", `You were banned from room ${roomCode}`);
     });
 
-    gs.socket.on("p-joined-room", (id: string, name: string) => {
+    gs.game.on("p-joined-room", (id: string, name: string) => {
         if (id === gs.player.id) return;
 
         gs.room.addPlayer(new Player(id, sanitizePlayerName(name)));
         updateUIPlayerList();
     });
 
-    gs.socket.on("p-left-room", (id: string) => {
+    gs.game.on("p-left-room", (id: string) => {
         gs.room.removePlayer(id);
         updateUIPlayerList();
     });
 
-    gs.socket.on("p-set-name", (id: string, name: string) => {
+    gs.game.on("p-set-name", (id: string, name: string) => {
         const player = gs.room.getPlayer(id);
         if (!player) return;
 
@@ -107,7 +120,7 @@ export function initGameSocket(): void {
         updateUIAllChat();
     });
 
-    gs.socket.on(
+    gs.game.on(
         "p-joined-board",
         (id: string, boardID: number, color: Color) => {
             const player = gs.room.getPlayer(id);
@@ -122,7 +135,7 @@ export function initGameSocket(): void {
         },
     );
 
-    gs.socket.on("p-left-board", (boardID: number, color: Color) => {
+    gs.game.on("p-left-board", (boardID: number, color: Color) => {
         gs.room.game.matches[boardID].removePlayer(color);
         updateUIPlayers(boardID);
         updateUIPlayerList();
@@ -130,7 +143,7 @@ export function initGameSocket(): void {
         refreshDualBoardLayout();
     });
 
-    gs.socket.on("p-set-status", (id: string, status: PlayerStatus) => {
+    gs.game.on("p-set-status", (id: string, status: PlayerStatus) => {
         const player = gs.room.getPlayer(id);
 
         if (!player) return;
@@ -142,7 +155,7 @@ export function initGameSocket(): void {
         refreshDualBoardLayout();
     });
 
-    gs.socket.on("room-settings-updated", (raw: SerializedGame) => {
+    gs.game.on("room-settings-updated", (raw: SerializedGame) => {
         gs.room.setGame(raw);
         const renderedBoardCount = document.querySelectorAll(
             "#game-area .match-container",
@@ -158,8 +171,9 @@ export function initGameSocket(): void {
         refreshDualBoardLayout();
     });
 
-    gs.socket.on("started-room", (raw: SerializedGame, timeStarted: number) => {
+    gs.game.on("started-room", (raw: SerializedGame, timeStarted: number) => {
         gs.room.status = RoomStatus.PLAYING;
+        gs.room.revision = 0;
         gs.room.setGame(raw);
         for (const match of gs.room.game.matches) match.lastMoveTime = timeStarted;
         clearLastMoves();
@@ -171,7 +185,7 @@ export function initGameSocket(): void {
         startTimeUpdates();
     });
 
-    gs.socket.on(
+    gs.game.on(
         "p-moved-board",
         (boardID: number, move: Move, newTime: number) => {
             const currentMatch = gs.room.game.matches[boardID];
@@ -193,6 +207,7 @@ export function initGameSocket(): void {
 
             rememberLastMove(boardID, move);
             gs.room.game.doMove(boardID, move, newTime);
+            gs.room.revision++;
 
             for (const match of gs.room.game.matches) {
                 if (match.queued.moves.length === 0) continue;
@@ -226,7 +241,7 @@ export function initGameSocket(): void {
         },
     );
 
-    gs.socket.on(
+    gs.game.on(
         "ended-room",
         (team: Team | undefined, reason: string, time: number) => {
             if (areClientClocksEnabled())
@@ -251,7 +266,7 @@ export function initGameSocket(): void {
         },
     );
 
-    gs.socket.on(
+    gs.game.on(
         "p-sent-chat",
         (id: string, message: string, isAllChat = false) => {
             const plaque = getPlayerPlaqueAppearance(id);
