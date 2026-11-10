@@ -5,7 +5,8 @@
 	"main": "dist/server/index.js",
 	"type": "module",
 	"scripts": {
-		"test": "node --import tsx --test tests/variants/*.test.ts tests/ui/*.test.ts",
+		"test": "node --import tsx --test tests/variants/*.test.ts tests/ui/*.test.ts && npm run test:server",
+		"test:server": "TSX_TSCONFIG_PATH=tests/tsconfig.json node --import tsx --test tests/server/*.test.ts",
 		"test:ui": "node --import tsx --test tests/ui/*.test.ts",
 		"test:typecheck": "tsc --project tests/tsconfig.json",
 		"test:variants": "node --import tsx --test tests/variants/*.test.ts",

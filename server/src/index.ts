@@ -20,6 +20,7 @@ import {
     recordPlayerSeen,
 } from "./stats-store";
 import { loadProfiles, saveProfiles, type Profile } from "./profile-store";
+import { removeEmptyRooms } from "./room-cleanup";
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -157,6 +158,7 @@ httpServer.listen(PORT, () => {
 
 setInterval(() => {
     const currentTime = Date.now();
+    removeEmptyRooms(rooms, currentTime);
     for (const [code, room] of rooms) {
         if (room.status === RoomStatus.PLAYING) {
             if (isKungFuInitialBoard(room.game.config.initialBoard)) {
@@ -175,7 +177,6 @@ setInterval(() => {
                         currentTime,
                     );
                     io.to(code).emit("room-host-updated", room.hostID);
-                    if (room.players.size === 0) rooms.delete(code);
                 }
                 continue;
             }
@@ -194,7 +195,6 @@ setInterval(() => {
                     currentTime,
                 );
                 io.to(code).emit("room-host-updated", room.hostID);
-                if (room.players.size === 0) rooms.delete(code);
             }
         }
     }

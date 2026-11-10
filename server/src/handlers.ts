@@ -13,6 +13,7 @@ import type { GameSocket } from "./index";
 import { io, profiles, rooms } from "./index";
 import { recordCompletedGame } from "./stats-store";
 import { saveProfiles } from "./profile-store";
+import { trackRoomPresence } from "./room-cleanup";
 
 export function setupHandlers(socket: GameSocket): void {
     socket.on("ping", () => {
@@ -679,6 +680,7 @@ function joinRoom(socket: GameSocket, code: string): void {
             `${getPlayerDisplayName(roomPlayer)} joined the room.`,
         );
     }
+    trackRoomPresence(room);
 }
 
 function hasAnotherRoomConnection(socket: GameSocket, code: string): boolean {
@@ -707,7 +709,7 @@ function handlePlayerLeave(socket: GameSocket, intentionalLeave: boolean): void 
 
     socket.room = undefined;
 
-    if (shouldDeleteRoom(room)) deleteRoom(room.code);
+    trackRoomPresence(room);
 }
 
 function handleLobbyPlayerLeave(
@@ -793,14 +795,6 @@ function markPlayerDisconnected(socket: GameSocket, room: Room): void {
     socket
         .to(room.code)
         .emit("p-set-status", socket.player.id, PlayerStatus.DISCONNECTED);
-}
-
-function shouldDeleteRoom(room: Room): boolean {
-    return room.status === RoomStatus.LOBBY && room.players.size === 0;
-}
-
-function deleteRoom(roomCode: string): void {
-    rooms.delete(roomCode);
 }
 
 function getPlayerSeats(

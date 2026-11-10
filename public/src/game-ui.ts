@@ -219,7 +219,7 @@ export function toggleGridMode(): void {
 }
 
 function shouldForceGridMode(): boolean {
-    return getTotalBoards() === 2;
+    return getTotalBoards() <= 2;
 }
 
 function setGridMode(enabled: boolean, forceLayout = false): void {
