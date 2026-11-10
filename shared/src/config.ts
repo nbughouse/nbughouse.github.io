@@ -67,7 +67,7 @@ export class GameConfig {
         timeShared: boolean = false,
         initialBoard: InitialBoard = "default",
         playerAssignment: PlayerAssignment = "random",
-        pocketShare: PocketShare = "color",
+        pocketShare: PocketShare = "none",
         dropAggression: DropAggression = "mate",
         promotionType: PromotionType = "upgrade",
         pawnDropRanks: string = "2-7",
@@ -117,9 +117,9 @@ export class GameConfig {
             data["player-assignment"] === "manual" ? "manual" : "random";
         const timeType = data["time-type"] === "delay" ? "delay" : "increment";
         const pocketShare =
-            data["pocket-share"] === "shared" || data["pocket-share"] === "none"
+            data["pocket-share"] === "shared" || data["pocket-share"] === "color"
                 ? data["pocket-share"]
-                : "color";
+                : "none";
         const dropAggression =
             data["drop-aggression"] === "no-check" ||
             data["drop-aggression"] === "no-mate"

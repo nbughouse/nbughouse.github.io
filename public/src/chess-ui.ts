@@ -17,6 +17,7 @@ import { gs } from "./session";
 import { getAssetPath } from "./app-paths";
 import { boardThemes } from "./settings";
 import { BoardPieceRenderer, type PieceTarget } from "./piece-motion";
+import { createIcon } from "./icons";
 
 // MARK: Global Variables
 
@@ -37,6 +38,10 @@ let pendingPromotion:
           onCancel: () => void;
           cleanup: () => void;
       }
+    | undefined;
+
+let pendingCapture:
+    | { boardID: number; move: Move; premove: boolean; preview: boolean; cleanup: () => void }
     | undefined;
 
 interface BoardMarks {
@@ -99,6 +104,8 @@ function clearManualAnnotations(matchIndex: number): void {
 function updateVisualChessState(matchIndex: number): void {
     const match = gs.room.game.matches[matchIndex];
     const chess = gs.room.game.getFinalChess(matchIndex);
+    if (pendingCapture?.boardID === matchIndex && pendingCapture.preview)
+        chess.doMove(pendingCapture.move, pendingCapture.premove, gs.room.game.getMoveRules());
     const previousState = visualChessStates.get(matchIndex);
 
     if (previousState && match.queued.moves.length === 0) {
@@ -548,7 +555,7 @@ function showPromotionDialog(
     cancelButton.type = "button";
     cancelButton.className = "promotion-cancel";
     cancelButton.setAttribute("aria-label", "Cancel promotion");
-    cancelButton.textContent = "\u00d7";
+    cancelButton.append(createIcon("close"));
     cancelButton.addEventListener("click", cancelPromotion);
     dialog.append(cancelButton);
 
@@ -665,6 +672,112 @@ function deselectPiece(): void {
 
 // MARK: Move Execution
 
+function showCaptureRecipientDialog(
+    id: number,
+    move: Move,
+    premove: boolean,
+    suppressTravel: boolean,
+    onConfirm?: () => void,
+): void {
+    if (pendingCapture || move.to.loc !== "board") return;
+    dropSelectedPiece();
+    const dialog = document.createElement("dialog");
+    dialog.className = "capture-recipient-dialog";
+    dialog.setAttribute("aria-label", "Give captured piece to a teammate");
+    const controls = document.createElement("div");
+    controls.className = "capture-recipient-controls";
+    dialog.append(controls);
+    const captureBoard = onConfirm ? gs.room.game.matches[id].chess : getVisualChess(id).chess;
+    const capturingPiece = captureBoard.getPiece(move.from);
+    const team = capturingPiece && gs.room.game.matches[id].getTeam(capturingPiece.color);
+    const positionDialog = () => {
+        if (move.to.loc !== "board") return;
+        const square = getSquareElement(id, move.to);
+        const bounds = square.getBoundingClientRect();
+        const gap = 6;
+        const size = Math.min(104, Math.max(84, bounds.width * 1.4));
+        const left = Math.max(gap, Math.min(window.innerWidth - size - gap, bounds.left + (bounds.width - size) / 2));
+        const top = Math.max(gap, Math.min(window.innerHeight - size - gap, bounds.top + (bounds.height - size) / 2));
+        dialog.style.width = `${size}px`;
+        dialog.style.height = `${size}px`;
+        dialog.style.left = `${left}px`;
+        dialog.style.top = `${top}px`;
+    };
+    const cleanup = () => {
+        window.removeEventListener("resize", positionDialog);
+        window.removeEventListener("scroll", positionDialog, true);
+        dialog.remove();
+    };
+    const finish = (recipient?: number) => {
+        pendingCapture = undefined;
+        cleanup();
+        if (recipient === undefined && onConfirm)
+            gs.room.game.matches[id].queued.moves.length = 0;
+        updateUIChess(id);
+        if (recipient === undefined || gs.room.status !== RoomStatus.PLAYING) return;
+        move.captureRecipient = recipient;
+        if (onConfirm) {
+            onConfirm();
+            return;
+        }
+        const board = getVisualChess(id).chess;
+        if (board.isLegal(move, premove, gs.room.game.getMoveRules()) &&
+            canUsePositionNow(id, move.from))
+            executeMove(id, move, premove, suppressTravel);
+    };
+    for (const boardID of gs.room.game.getCaptureRecipientBoards(id)) {
+        const side = boardID < id ? "left" : "right";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `capture-recipient-${side}`;
+        button.append(createIcon(side === "left" ? "arrow-left" : "arrow-right"));
+        const teammate = team && gs.room.game.matches[boardID].getPlayerTeam(team);
+        button.setAttribute("aria-label", `Give to ${side}${teammate ? ` (${teammate.name})` : ""}`);
+        button.addEventListener("click", () => finish(boardID));
+        controls.append(button);
+    }
+    dialog.addEventListener("click", event => {
+        if (event.target === dialog || event.target === controls) finish();
+    });
+    dialog.addEventListener("cancel", event => {
+        event.preventDefault();
+        finish();
+    });
+    dialog.addEventListener("keydown", event => event.stopPropagation());
+    pendingCapture = {
+        boardID: id, move, premove, cleanup,
+        preview: !gs.room.game.matches[id].queued.moves.includes(move),
+    };
+    deselectPiece();
+    updateUIChess(id);
+    document.body.append(dialog);
+    positionDialog();
+    dialog.showModal();
+    window.addEventListener("resize", positionDialog);
+    window.addEventListener("scroll", positionDialog, true);
+}
+
+export function submitQueuedMove(id: number): void {
+    const game = gs.room.game;
+    const match = game.matches[id];
+    const move = match.queued.moves[0];
+    if (!move || pendingCapture || gs.room.status !== RoomStatus.PLAYING) return;
+    const send = () => {
+        if (match.queued.moves[0] === move &&
+            match.chess.isLegal(move, false, game.getMoveRules()) &&
+            game.canMove(id, move))
+            gs.socket.emit("move-board", id, match.chess.turn, move);
+    };
+    if (game.config.pocketShare === "none" &&
+        move.captureRecipient === undefined &&
+        game.getCaptureRecipientBoards(id).length > 1 &&
+        game.getCapturedPiece(id, move)) {
+        showCaptureRecipientDialog(id, move, false, false, send);
+        return;
+    }
+    send();
+}
+
 function executeMove(
     id: number,
     move: Move,
@@ -675,7 +788,19 @@ function executeMove(
     const rules = gs.room.game.getMoveRules();
     if (rules.turnless) premove = false;
 
-    const color = selected?.piece.color ?? board.turn;
+    const captured = gs.room.game.config.pocketShare === "none" &&
+        move.captureRecipient === undefined
+        ? board.clone().doMove(move, premove, rules).captured : undefined;
+    if (captured && !(rules.duck && captured.type === PieceType.KING)) {
+        const recipients = gs.room.game.getCaptureRecipientBoards(id);
+        if (recipients.length > 1) {
+            showCaptureRecipientDialog(id, move, premove, suppressTravel);
+            return;
+        }
+        move.captureRecipient = recipients[0];
+    }
+
+    const color = board.getPiece(move.from)?.color ?? selected?.piece.color ?? board.turn;
     if (!premove) gs.socket.emit("move-board", id, color, move);
 
     gs.room.game.matches[id].queued.color = color;
@@ -1206,6 +1331,8 @@ export function rememberLastMove(boardID: number, move: Move): void {
 }
 
 export function clearLastMoves(): void {
+    pendingCapture?.cleanup();
+    pendingCapture = undefined;
     lastMoves.clear();
     visualMoves.clear();
     for (const { renderer } of boardPieceRenderers.values()) renderer.clear();

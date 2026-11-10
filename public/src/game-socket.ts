@@ -29,6 +29,7 @@ import { showError, showMenuScreen } from "./menu-ui";
 import {
     clearLastMoves,
     rememberLastMove,
+    submitQueuedMove,
 } from "./chess-ui";
 import {
     areClientClocksEnabled,
@@ -220,12 +221,7 @@ export function initGameSocket(): void {
                     gs.room.game.getMoveRules(),
                 )
             ) {
-                gs.socket.emit(
-                    "move-board",
-                    boardID,
-                    currentMatch.chess.turn,
-                    currentMatch.queued.moves[0],
-                );
+                submitQueuedMove(boardID);
             }
         },
     );
@@ -298,6 +294,7 @@ function movesEqual(first: Move, second: Move): boolean {
     return (
         positionsEqual(first.from, second.from) &&
         positionsEqual(first.to, second.to) &&
-        first.promotion === second.promotion
+        first.promotion === second.promotion &&
+        first.captureRecipient === second.captureRecipient
     );
 }

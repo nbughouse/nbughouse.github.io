@@ -507,11 +507,38 @@ export class Game {
         move: Move,
         currentTime: number = Date.now(),
     ): boolean {
+        if (this.config.pocketShare === "none") {
+            const targets = this.getCaptureRecipientBoards(matchIndex);
+            if (move.captureRecipient !== undefined &&
+                !targets.includes(move.captureRecipient)) return false;
+            if (targets.length > 1 && move.captureRecipient === undefined &&
+                this.getCapturedPiece(matchIndex, move)) return false;
+        }
         if (!hasInitialBoardVariant(this.config.initialBoard, "taijitu"))
             return true;
 
         const match = this.matches[matchIndex];
         return match.chess.canMoveFrom(move.from, currentTime);
+    }
+
+    getCaptureRecipientBoards(matchIndex: number): number[] {
+        return [matchIndex - 1, matchIndex + 1].filter(
+            index => index >= 0 && index < this.matches.length,
+        );
+    }
+
+    getCapturedPiece(matchIndex: number, move: Move, premove = false): MoveResult["captured"] {
+        const captured = this.matches[matchIndex].chess.clone().doMove(
+            move, premove, this.getMoveRules(),
+        ).captured;
+        // Capturing the duck variant's king ends the game without a transfer.
+        return this.getMoveRules().duck && captured?.type === PieceType.KING
+            ? undefined : captured;
+    }
+
+    private getTeamPocketColor(matchIndex: number, team: Team): Color {
+        return this.matches[matchIndex].getTeam(Color.WHITE) === team
+            ? Color.WHITE : Color.BLACK;
     }
 
     getMoveRules(): MoveRules {
@@ -557,35 +584,33 @@ export class Game {
         if (move.from.loc === "pocket" && move.from.type === PieceType.DUCK) return;
         if (result.captured) {
             if (this.getMoveRules().duck && result.captured.type === PieceType.KING) return;
-            for (let index = 0; index < this.matches.length; index++) {
-                if (index === matchID) continue;
-                if (
-                    this.matches[index].flipped ===
-                    this.matches[matchID].flipped
-                )
-                    continue;
-
-                this.matches[index].chess.addToPocket(result.captured);
+            const team = this.matches[matchID].getTeam(invertColor(result.captured.color));
+            const recipients = this.config.pocketShare === "none"
+                ? [move.captureRecipient ?? this.getCaptureRecipientBoards(matchID)[0]]
+                : this.matches.map((_, index) => index);
+            for (const index of recipients) {
+                if (index === undefined) continue;
+                const colors = this.config.pocketShare === "shared"
+                    ? [Color.WHITE, Color.BLACK]
+                    : [this.getTeamPocketColor(index, team)];
+                for (const color of colors)
+                    this.matches[index].chess.addToPocket({ ...result.captured, color });
             }
         }
 
-        if (move.from.loc === "pocket") {
+        if (move.from.loc === "pocket" && this.config.pocketShare !== "none") {
+            const team = this.matches[matchID].getTeam(move.from.color);
             for (let index = 0; index < this.matches.length; index++) {
-                if (index === matchID) continue;
-                if (
-                    this.matches[index].flipped !==
-                    this.matches[matchID].flipped
-                )
-                    continue;
-
-                this.matches[index].chess.removeFromPocket(
-                    move.from.type,
-                    move.from.color,
-                );
-                this.matches[index].chess.setPocketCooldown(
-                    move.from.color,
-                    currentTime + this.getPocketCooldownMs(),
-                );
+                const colors = this.config.pocketShare === "shared"
+                    ? [Color.WHITE, Color.BLACK]
+                    : [this.getTeamPocketColor(index, team)];
+                for (const color of colors) {
+                    if (index === matchID && color === move.from.color) continue;
+                    this.matches[index].chess.removeFromPocket(move.from.type, color);
+                    this.matches[index].chess.setPocketCooldown(
+                        color, currentTime + this.getPocketCooldownMs(),
+                    );
+                }
             }
         }
     }
@@ -663,6 +688,7 @@ export class Game {
             [Team.BLUE, 0],
             [Team.RED, 0],
         ]);
+        const countedPocketTeams = new Set<Team>();
 
         for (const match of this.matches) {
             for (const row of match.chess.board) {
@@ -678,6 +704,10 @@ export class Game {
                     match.chess.getPocket(color).get(PieceType.KING) ?? 0;
                 if (pocketKings <= 0) continue;
                 const team = match.getTeam(color);
+                if (this.config.pocketShare !== "none") {
+                    if (countedPocketTeams.has(team)) continue;
+                    countedPocketTeams.add(team);
+                }
                 kingCounts.set(team, (kingCounts.get(team) ?? 0) + pocketKings);
             }
         }

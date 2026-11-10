@@ -6,6 +6,7 @@ import { move, drop, gameFor, play } from "../helpers";
 export function taijituTests(variant: string): void {
     test(`${variant}: cooldowns are independent per piece and survive serialization`, () => {
         const game = gameFor(variant);
+        game.config.pocketShare = "color";
         game.config.pieceCooldown = 2;
         game.config.pocketCooldown = 3;
         const chess = game.matches[0].chess;
@@ -16,8 +17,8 @@ export function taijituTests(variant: string): void {
         assert.equal(game.canMove(0, next, 2999), false);
         assert.equal(game.canMove(0, next, 3000), true);
         game.matches.push(new Match(180000, false));
-        for (const index of [0, 2])
-            game.matches[index].chess.whitePocket.set(PieceType.KNIGHT, 2);
+        for (const index of [0, 1, 2])
+            game.matches[index].chess.getPocket(index === 1 ? Color.BLACK : Color.WHITE).set(PieceType.KNIGHT, 2);
         play(game, drop(Color.WHITE, PieceType.KNIGHT, 4, 3), 0, 1000);
         const restored = Game.deserialize(JSON.parse(JSON.stringify(game.serialize())));
         assert.equal(restored.canMove(0, next, 2999), false);

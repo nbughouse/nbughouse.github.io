@@ -60,7 +60,7 @@
 					</div>
 					<div id="join-section" class="menu-view hidden">
 						<div id="join-view-topbar">
-							<button id="back-to-menu-btn" class="open-arrow" type="button" aria-label="Back">←</button>
+							<button id="back-to-menu-btn" type="button" aria-label="Back"></button>
 						</div>
 						<div id="join-form">
 							<label class="join-field" for="join-room-code-input">
@@ -80,8 +80,8 @@
 					</div>
 					<div id="name-section" class="menu-view hidden">
 						<div class="menu-view-topbar">
-							<button id="back-from-name-btn" class="open-arrow" type="button"
-								aria-label="Back">←</button>
+							<button id="back-from-name-btn" type="button"
+								aria-label="Back"></button>
 						</div>
 						<div id="name-form">
 							<label class="join-field" for="action-player-name-input">
@@ -96,8 +96,8 @@
 					</div>
 					<div id="help-section" class="menu-view hidden">
 						<div class="menu-view-topbar">
-							<button id="back-from-help-btn" class="open-arrow" type="button"
-								aria-label="Back">←</button>
+							<button id="back-from-help-btn" type="button"
+								aria-label="Back"></button>
 						</div>
 						<div id="help-content">
 							<section class="help-block">
@@ -140,8 +140,8 @@
 					</div>
 					<div id="stats-section" class="menu-view hidden">
 						<div class="menu-view-topbar">
-							<button id="back-from-stats-btn" class="open-arrow" type="button"
-								aria-label="Back">←</button>
+							<button id="back-from-stats-btn" type="button"
+								aria-label="Back"></button>
 						</div>
 						<div id="stats-content">
 							<section class="stats-hero">
@@ -192,8 +192,8 @@
 					</div>
 					<div id="menu-settings-section" class="menu-view hidden">
 						<div class="menu-view-topbar">
-							<button id="back-from-settings-btn" class="open-arrow" type="button"
-								aria-label="Back">←</button>
+							<button id="back-from-settings-btn" type="button"
+								aria-label="Back"></button>
 						</div>
 						<div class="menu-settings-form">
 							<label class="settings-field">
@@ -323,11 +323,11 @@
 								<option value="delay">Delay</option>
 							</select>
 						</label>
-						<label class="settings-field">
+						<label class="settings-field hidden">
 							<span>Piece cooldown</span>
 							<input type="number" id="setting-piece-cooldown" min="0" max="3600" step="1" />
 						</label>
-						<label class="settings-field">
+						<label class="settings-field hidden">
 							<span>Pocket cooldown</span>
 							<input type="number" id="setting-pocket-cooldown" min="0" max="3600" step="1" />
 						</label>
@@ -365,9 +365,9 @@
 						<label class="settings-field">
 							<span>Pockets</span>
 							<select id="setting-pocket-share">
+								<option value="none">Independent</option>
 								<option value="color">Team colors</option>
 								<option value="shared">Everyone</option>
-								<option value="none">Independent</option>
 							</select>
 						</label>
 					</div>
@@ -415,13 +415,13 @@
 		</div>
 		<div id="game-area-wrapper">
 			<div class="scroll-controls">
-				<button class="scroll-btn open-arrow" id="scrollLeft">←</button>
+				<button class="scroll-btn" id="scrollLeft" type="button" aria-label="Previous board"><span class="ui-icon ui-icon-arrow-left" aria-hidden="true"></span></button>
 				<span class="scroll-indicator">Board <span id="boardRange">1</span> of
 					<span id="totalBoards">1</span></span>
 				<button id="grid-toggle-btn" class="control-btn">
 					Grid View
 				</button>
-				<button class="scroll-btn open-arrow" id="scrollRight">→</button>
+				<button class="scroll-btn" id="scrollRight" type="button" aria-label="Next board"><span class="ui-icon ui-icon-arrow-right" aria-hidden="true"></span></button>
 			</div>
 			<div id="game-area" class="hide-scrollbar"></div>
 		</div>

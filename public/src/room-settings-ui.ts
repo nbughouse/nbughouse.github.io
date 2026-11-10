@@ -162,9 +162,9 @@ export function initRoomSettingsUI(): void {
     createSettingsSelect(
         document.querySelector("#setting-pocket-share") as HTMLSelectElement,
         [
+            { value: "none", label: "Independent" },
             { value: "color", label: "Team colors" },
             { value: "shared", label: "Everyone" },
-            { value: "none", label: "Independent" },
         ],
     );
 }
@@ -434,11 +434,20 @@ function getInitialBoardSetting(
 function syncRoomVariantButtons(
     initialBoardModeSelect: HTMLSelectElement | null,
 ): void {
-    const activeVariants = parseInitialBoardVariants(
+    const initialBoard =
         initialBoardModeSelect?.dataset.initialBoard ??
-            initialBoardModeSelect?.value ??
-            "default",
-    );
+        initialBoardModeSelect?.value ??
+        "default";
+    const activeVariants = parseInitialBoardVariants(initialBoard);
+
+    for (const selector of [
+        "#setting-piece-cooldown",
+        "#setting-pocket-cooldown",
+    ])
+        document
+            .querySelector(selector)
+            ?.closest(".settings-field")
+            ?.classList.toggle("hidden", !isKungFuInitialBoard(initialBoard));
 
     for (const variantButton of document.querySelectorAll<HTMLButtonElement>(
         ".room-variant-button",

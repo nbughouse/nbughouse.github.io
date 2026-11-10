@@ -6,15 +6,6 @@
    font-display: swap;
 }
 
-@font-face {
-   font-family: "open-arrow";
-   src: url("../assets/fonts/OpenArrow-Regular.woff2") format("woff2");
-   font-weight: normal;
-   font-style: normal;
-   font-display: swap;
-   unicode-range: U+2190-21FF;
-}
-
 :root {
    --font-family: "League Spartan", sans-serif;
    --font-weight-bold: 600;
@@ -95,9 +86,29 @@ textarea {
    font: inherit;
 }
 
-.open-arrow {
-   font-family: "open-arrow", var(--font-family);
-   font-weight: normal;
+.ui-icon {
+   display: inline-block;
+   color: inherit;
+   flex-shrink: 0;
+   width: 1em;
+   height: 1em;
+   background: currentColor;
+   pointer-events: none;
+   -webkit-mask: var(--ui-icon) center / contain no-repeat;
+   mask: var(--ui-icon) center / contain no-repeat;
+}
+
+.ui-icon-arrow-left,
+.ui-icon-arrow-right {
+   --ui-icon: url("../assets/img/open-arrow-left.svg");
+}
+
+.ui-icon-arrow-right {
+   transform: rotate(180deg);
+}
+
+.ui-icon-close {
+   --ui-icon: url("../assets/img/close.svg");
 }
 
 /* Error messages */

@@ -15,12 +15,12 @@ import {
 import { gs } from "./session";
 
 let gridMode = false;
-let gridLayoutObserver: ResizeObserver | undefined;
+let boardLayoutObserver: ResizeObserver | undefined;
 let dualBoardPrimaryID: number | undefined;
 const boardLayoutAnimations = new WeakMap<HTMLElement, Animation>();
 
 export function initGameControls(): void {
-    initGridLayoutObserver();
+    initBoardLayoutObserver();
 
     document
         .querySelector("#grid-toggle-btn")
@@ -77,8 +77,8 @@ export function rebuildRoomBoardElements(): void {
     for (let index = matches.length; index < gs.room.game.matches.length; index++)
         createMatchElements(index);
 
-    setGridMode(shouldForceGridMode(), true);
     updateBoardNavigationVisibility();
+    setGridMode(shouldForceGridMode(), true);
 
     const totalBoardsSpan = document.querySelector("#totalBoards");
     if (totalBoardsSpan)
@@ -235,12 +235,13 @@ function setGridMode(enabled: boolean, forceLayout = false): void {
         gameArea.classList.add("grid-mode");
         replaceGridToggleIcon(gridToggleButton, "grid");
 
-        updateGridLayout();
+        updateBoardLayout();
     } else {
         gameArea.classList.remove("grid-mode");
         replaceGridToggleIcon(gridToggleButton, "columns");
 
         resetToFlexLayout();
+        updateBoardLayout();
     }
     updateScrollButtons();
 }
@@ -287,12 +288,12 @@ function createGridToggleIcon(mode: "grid" | "columns"): SVGSVGElement {
     return svg;
 }
 
-function initGridLayoutObserver(): void {
+function initBoardLayoutObserver(): void {
     const gameArea = document.querySelector("#game-area") as HTMLDivElement;
 
-    gridLayoutObserver?.disconnect();
-    gridLayoutObserver = new ResizeObserver(() => updateGridLayout());
-    gridLayoutObserver.observe(gameArea);
+    boardLayoutObserver?.disconnect();
+    boardLayoutObserver = new ResizeObserver(() => updateBoardLayout());
+    boardLayoutObserver.observe(gameArea);
 }
 
 function readPixelValue(value: string): number {
@@ -300,9 +301,7 @@ function readPixelValue(value: string): number {
     return Number.isFinite(pixels) ? pixels : 0;
 }
 
-function updateGridLayout(): void {
-    if (!gridMode) return;
-
+function updateBoardLayout(): void {
     const gameArea = document.querySelector("#game-area") as HTMLDivElement;
     const matches = gameArea.querySelectorAll(".match-container");
     const boardCount = matches.length;
@@ -337,10 +336,23 @@ function updateGridLayout(): void {
         style.getPropertyValue("--plaque-height-board-ratio"),
     );
 
-    // The match itself is 8 squares wide by 10 high. In grid mode, the two
+    // The match itself is 8 squares wide by 10 high. The two
     // externally positioned player plaques are also part of its visual height.
     const matchRatio = 8 / 10;
     const visualRatio = 8 / (10 + plaqueHeightBoardRatio * 16);
+
+    if (!gridMode) {
+        const width = Math.max(0, availableHeight * visualRatio);
+        for (const match of matches) {
+            const element = match as HTMLElement;
+            element.style.width = `${width}px`;
+            element.style.height = `${width / matchRatio}px`;
+            element.style.setProperty("--board-size", `${width}px`);
+            element.style.setProperty("--square-size", `${width / 8}px`);
+        }
+        updateScrollButtons();
+        return;
+    }
 
     let bestW = 0;
     let bestCols = 1;
@@ -479,7 +491,7 @@ function getPreferredPrimaryBoardID(
 }
 
 export function refreshDualBoardLayout(): void {
-    if (gridMode) updateGridLayout();
+    if (gridMode) updateBoardLayout();
 }
 
 function lockDualBoardOrderForGame(): void {

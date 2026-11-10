@@ -1,6 +1,7 @@
 /* Scroll Controls */
 .scroll-controls {
    display: flex;
+   flex-shrink: 0;
    justify-content: center;
    align-items: center;
    gap: 2vh;
@@ -49,6 +50,79 @@
    height: 2.5vh;
 }
 
+/* Capture Recipient Dialog */
+.capture-recipient-dialog {
+   position: fixed;
+   inset: auto;
+   margin: 0;
+   padding: 0;
+   border: 0;
+   overflow: visible;
+   background: transparent;
+}
+
+.capture-recipient-controls {
+   position: absolute;
+   inset: 0;
+   opacity: 0.75;
+   border: 1px solid rgb(255 255 255 / 24%);
+   border-radius: 50%;
+   overflow: hidden;
+   background: var(--primary);
+   box-shadow:
+      0 6px 20px rgb(0 0 0 / 45%),
+      0 1px 3px rgb(0 0 0 / 30%),
+      inset 0 1px 0 rgb(255 255 255 / 10%);
+}
+
+.capture-recipient-dialog::backdrop {
+   background: transparent;
+}
+
+.capture-recipient-dialog button {
+   position: absolute;
+   top: 0;
+   display: grid;
+   place-items: center;
+   width: 50%;
+   min-width: 0;
+   height: 100%;
+   padding: 0;
+   border-radius: 0;
+   font-size: 22px;
+   line-height: 1;
+   box-shadow: none;
+   color: #f4ead8;
+   background: linear-gradient(180deg, rgb(255 255 255 / 9%), rgb(255 255 255 / 2%));
+   transition: background 120ms ease, color 120ms ease;
+}
+
+.capture-recipient-dialog .capture-recipient-left {
+   left: 0;
+   border-right: 1px solid rgb(255 255 255 / 10%);
+}
+
+.capture-recipient-dialog .capture-recipient-right {
+   right: 0;
+}
+
+.capture-recipient-dialog button:hover {
+   background: color-mix(in srgb, var(--yellow) 22%, var(--primary));
+   color: var(--yellow);
+   filter: none;
+}
+
+.capture-recipient-dialog button:focus-visible {
+   outline: none;
+   background: color-mix(in srgb, var(--yellow) 22%, var(--primary));
+   color: var(--yellow);
+}
+
+.capture-recipient-dialog button:active:not(:disabled) {
+   transform: none;
+   box-shadow: none;
+}
+
 /* Promotion Dialog */
 .promotion-dialog {
    position: fixed;
@@ -95,6 +169,8 @@
 }
 
 .promotion-cancel {
+   display: grid;
+   place-items: center;
    --button-color: white;
    flex: 0 0 calc(var(--promotion-square-size) / 2);
    border-radius: 0;

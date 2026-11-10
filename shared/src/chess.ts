@@ -1341,6 +1341,8 @@ export interface Move {
     from: Position;
     to: Position;
     promotion?: PieceType;
+    /** Destination board for an independent-pocket capture. */
+    captureRecipient?: number;
 }
 
 export interface MoveResult {

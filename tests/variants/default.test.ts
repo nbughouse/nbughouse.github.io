@@ -41,7 +41,7 @@ test("drop aggression rejects checking and mating drops according to settings", 
     assert.equal(chess.getPocket(Color.WHITE).get(PieceType.QUEEN), 1);
 });
 
-test("captures and shared drops record changes in another board's pockets only once", () => {
+test("captures update the recipient's repetition history and independent drops leave other pockets alone", () => {
     const game = gameFor("default");
     game.matches.push(new Match(180000, false));
     const chess = game.matches[0].chess;
@@ -55,6 +55,6 @@ test("captures and shared drops record changes in another board's pockets only o
     assert.equal(game.matches[1].chess.serialize().repetitionCounts?.length, 2);
     for (const index of [0, 2]) game.matches[index].chess.whitePocket.set(PieceType.BISHOP, 1);
     play(game, drop(Color.WHITE, PieceType.BISHOP, 5, 5));
-    assert.equal(game.matches[2].chess.whitePocket.has(PieceType.BISHOP), false);
+    assert.equal(game.matches[2].chess.whitePocket.has(PieceType.BISHOP), true);
     assert.equal(game.matches[1].chess.serialize().repetitionCounts?.length, 2);
 });

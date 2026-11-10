@@ -11,6 +11,7 @@ taijituTests("taijitu");
 
 test("Kung Fu permits either color and enforces piece and shared pocket cooldowns", () => {
     const game = gameFor("taijitu");
+    game.config.pocketShare = "color";
     game.matches.push(new Match(180000, false));
     const chess = game.matches[0].chess;
     chess.board[1][0] = { type: PieceType.PAWN, color: Color.BLACK };
@@ -20,7 +21,8 @@ test("Kung Fu permits either color and enforces piece and shared pocket cooldown
     const next = move(2, 0, 3, 0);
     assert.equal(game.canMove(0, next, 10999), false);
     assert.equal(game.canMove(0, next, 11000), true);
-    for (const index of [0, 2]) game.matches[index].chess.whitePocket.set(PieceType.KNIGHT, 2);
+    for (const index of [0, 1, 2])
+        game.matches[index].chess.getPocket(index === 1 ? Color.BLACK : Color.WHITE).set(PieceType.KNIGHT, 2);
     play(game, drop(Color.WHITE, PieceType.KNIGHT, 5, 3), 0, 1000);
     assert.equal(game.matches[2].chess.whitePocket.get(PieceType.KNIGHT), 1);
     assert.equal(game.canMove(2, drop(Color.WHITE, PieceType.KNIGHT, 4, 3), 10999), false);
